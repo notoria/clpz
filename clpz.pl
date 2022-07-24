@@ -193,6 +193,8 @@ type_error(Expectation, Term) :-
         type_error(Expectation, Term, unknown(Term)-1).
 
 
+:- meta_predicate(partition(1, ?, ?, ?)).
+
 partition(Pred, Ls0, As, Bs) :-
         include(Pred, Ls0, As),
         exclude(Pred, Ls0, Bs).
@@ -213,6 +215,8 @@ partition_([X|Xs], Pred, Ls0, Es0, Gs0) :-
    include/3 and exclude/3
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+:- meta_predicate(include(1, ?, ?)).
+
 include(Goal, Ls0, Ls) :-
         include_(Ls0, Goal, Ls).
 
@@ -225,6 +229,7 @@ include_([L|Ls0], Goal, Ls) :-
         include_(Ls0, Goal, Rest).
 
 
+:- meta_predicate(exclude(1, ?, ?)).
 
 exclude(Goal, Ls0, Ls) :-
         exclude_(Ls0, Goal, Ls).
