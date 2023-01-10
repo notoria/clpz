@@ -3,7 +3,7 @@
     Author:        Markus Triska
     E-mail:        triska@metalevel.at
     WWW:           https://www.metalevel.at
-    Copyright (C): 2016-2022 Markus Triska
+    Copyright (C): 2016-2023 Markus Triska
 
     This library provides CLP(ℤ):
 
@@ -3535,7 +3535,7 @@ parse_reified(E, R, D,
                m(A>>B)       => [function(D,>>,A,B,R)],
                m(A/\B)       => [function(D,/\,A,B,R)],
                m(A\/B)       => [function(D,\/,A,B,R)],
-               m(xor(A, B))  => [skeleton(A,B,D,R,pxor)],
+               m(xor(A, B))  => [function(D,xor,A,B,R)],
                g(true)       => [g(domain_error(clpz_expression, E))]]
              ).
 
