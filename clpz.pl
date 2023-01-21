@@ -5820,6 +5820,10 @@ run_propagator(preified_slash(X, Y, D, R), MState) -->
         (   Y == 0 ->
             kill(MState),
             D = 0
+        ;   Y == 1 ->
+            kill(MState),
+            D = 1,
+            R = X
         ;   nonvar(X),
             nonvar(Y) ->
             kill(MState),
