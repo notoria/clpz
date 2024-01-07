@@ -5495,7 +5495,7 @@ run_propagator(pexp(X,Y,Z), MState) -->
                 fd_put(Z, ZD2, ZPs),
                 { (   even(Y), ZU = n(Num) ->
                     integer_kth_root_leq(Num, Y, RU),
-                    (   XL cis_geq n(0), ZL = n(Num1) ->
+                    (   XL cis_geq n(0), ZL = n(Num1), Num1 >= 0 ->
                         integer_kth_root_leq(Num1, Y, RL0),
                         (   RL0^Y < Num1 -> RL is RL0 + 1
                         ;   RL = RL0
