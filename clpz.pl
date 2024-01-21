@@ -4187,7 +4187,7 @@ activate_propagator(propagator(P,State)) -->
             )
         ).
 
-%do_queue --> print_queue, { false }.
+%do_queue --> print_queue, false.
 do_queue -->
         (   queue_enabled ->
             (   queue_get_goal(Goal) -> { call(Goal) }, do_queue
@@ -4551,7 +4551,7 @@ run_propagator(pserialized(S_I, D_I, S_J, D_J, _), MState) -->
             kill(MState),
             (   S_I + D_I =< S_J -> []
             ;   S_J + D_J =< S_I -> []
-            ;   { false }
+            ;   false
             )
         ;   serialize_lower_upper(S_I, D_I, S_J, D_J, MState),
             serialize_lower_upper(S_J, D_J, S_I, D_I, MState)
@@ -5008,8 +5008,8 @@ run_propagator(ptzdiv(X,Y,Z), MState) -->
 %% % Z = X mod Y
 
 run_propagator(pmod(X,Y,Z), MState) -->
-        (   Y == 0 -> { false }
-        ;   Y == Z -> { false }
+        (   Y == 0 -> false
+        ;   Y == Z -> false
         ;   X == Y -> kill(MState), queue_goal(Z = 0)
         ;   true
         ),
@@ -5338,7 +5338,7 @@ run_propagator(pmax(X,Y,Z), MState) -->
             ;   nonvar(Z) ->
                 (   Z =:= X -> kill(MState), queue_goal(X #>= Y)
                 ;   Z > X -> queue_goal(Z = Y)
-                ;   { false } % Z < X
+                ;   false % Z < X
                 )
             ;   Y == Z -> kill(MState), queue_goal(Y #>= X)
             ;   { fd_get(Y, _, YInf, YSup, _) },
@@ -5374,7 +5374,7 @@ run_propagator(pmin(X,Y,Z), MState) -->
             ;   nonvar(Z) ->
                 (   Z =:= X -> kill(MState), { X #=< Y }
                 ;   Z < X -> Z = Y
-                ;   { false } % Z > X
+                ;   false % Z > X
                 )
             ;   Y == Z -> kill(MState), queue_goal(Y #=< X)
             ;   { fd_get(Y, _, YInf, YSup, _) },
@@ -5676,8 +5676,7 @@ run_propagator(reified_fd(V,B), MState) -->
             B = 1
         ;   { B == 0 } ->
             (   { fd_inf(V, inf) } -> []
-            ;   { fd_sup(V, sup) } -> []
-            ;   { false }
+            ;   { fd_sup(V, sup) }
             )
         ;   []
         ).
