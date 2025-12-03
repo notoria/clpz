@@ -1,5 +1,3 @@
-:- include("fold").
-
 % Source: https://www.cs.cmu.edu/~15122/slides/review/16-avl.pdf
 % Source: https://www.cs.cmu.edu/~15122/handouts/slides/review/16-avl.pdf
 % Source: https://www.cs.emory.edu/~cheung/Courses/253/Syllabus/Trees/AVL-delete.html
@@ -95,8 +93,13 @@ avlt_height(t(_,_,H,_,_), H).
 % avlt_minimum(T, _, _) :-
 %     var(T),
 %     throw(error(instantiation_error,avlt_minimum/3)).
-avlt_minimum(T, K, V) :-
-    once(foldl(avlt_left, T, t(K,V,_,t,_))).
+avlt_minimum(t(K0,V0,_,L,_), K, V) :-
+    '@avlt_minimum'(L, K0, V0, K, V).
+
+'@avlt_minimum'(t, K, V, K, V).
+'@avlt_minimum'(t(K0,V0,_,L,_), _, _, K, V) :-
+    '@avlt_minimum'(L, K0, V0, K, V).
+
 
 avlt_left(t(_,_,_,L,_), L).
 
@@ -104,8 +107,13 @@ avlt_left(t(_,_,_,L,_), L).
 % avlt_maximum(T, _, _) :-
 %     var(T),
 %     throw(error(instantiation_error,avlt_maximum/3)).
-avlt_maximum(T, K, V) :-
-    once(foldl(avlt_right, _, T, t(K,V,_,_,t))).
+avlt_maximum(t(K0,V0,_,_,R), K, V) :-
+    '@avlt_maximum'(R, K0, V0, K, V).
+
+'@avlt_maximum'(t, K, V, K, V).
+'@avlt_maximum'(t(K0,V0,_,_,R), _, _, K, V) :-
+    '@avlt_maximum'(R, K0, V0, K, V).
+
 
 avlt_right(t(_,_,_,_,R), R).
 

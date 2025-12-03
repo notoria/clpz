@@ -8,12 +8,12 @@
 
 disjoint2(Rs0) :-
         must_be(list, Rs0),
-        maplist(=.., Rs0, Rs),
+        list_map(=.., Rs0, Rs),
         non_overlapping(Rs).
 
 non_overlapping([]).
 non_overlapping([R|Rs]) :-
-        maplist(non_overlapping_(R), Rs),
+        list_map(non_overlapping_(R), Rs),
         non_overlapping(Rs).
 
 non_overlapping_(A, B) :-

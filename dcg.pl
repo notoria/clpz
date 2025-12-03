@@ -1,5 +1,3 @@
-% :- include("lists").
-
 phrase(NT, S0) :-
     phrase(NT, S0, []).
 
@@ -36,11 +34,24 @@ dcg_rule(( NonTerminal --> GRBody ), ( Head :- Body )) :-
    dcg_non_terminal(NonTerminal, S0,S, Head),
    dcg_body(GRBody, S0,S, Body).
 
+dcg_callable(Term0) :-
+    Term = Term0,
+    catch(
+        (false, Term ; true),
+        error(type_error(callable,_),_),
+        throw(error(type_error(callable,Term),_))
+    ).
+
 dcg_non_terminal(NonTerminal, S0,S, Goal) :-
+   dcg_callable(NonTerminal),
    NonTerminal =.. NonTerminalUniv,
    dcg_append(NonTerminalUniv, [S0,S], GoalUniv),
    Goal =.. GoalUniv.
 
+dcg_terminals(Terminals, _,_, _) :-
+   '$skip_max_list'(_, _, Terminals, Tail),
+    \+ (functor(Tail, N, A), N/A == []/0),
+   throw(error(type_error(list,Terminals),dcg_body/4)).
 dcg_terminals(Terminals, S0,S, S0 = List) :-
    dcg_append(Terminals, S, List).
 
@@ -48,11 +59,9 @@ dcg_body(Var, _,_, _) :-
    var(Var),
    throw(error(instantiation_error,dcg_body/4)).
 dcg_body(GRBody, S0,S, Body) :-
-   nonvar(GRBody),
    dcg_constr(GRBody),
    dcg_cbody(GRBody, S0,S, Body).
 dcg_body(NonTerminal, S0,S, Goal) :-
-   nonvar(NonTerminal),
    \+ dcg_constr(NonTerminal),
    NonTerminal \= ( _ -> _ ),
    NonTerminal \= ( \+ _ ),
@@ -91,7 +100,9 @@ dcg_cbody(( GRCond ; GRElse ), S0,S, ( Cond ; Else )) :-
 dcg_cbody(( GREither '|' GROr ), S0,S, ( Either ; Or )) :-
    dcg_body(GREither, S0,S, Either),
    dcg_body(GROr, S0,S, Or).
-dcg_cbody({Goal}, S0,S, ( Goal, S0 = S )).
+dcg_cbody({Goal0}, S0,S, ( Goal, S0 = S )) :-
+   dcg_callable(Goal0),
+   Goal = Goal0.
 dcg_cbody(call(Cont), S0,S, call(Cont, S0,S)).
 dcg_cbody(phrase(Body), S0,S, phrase(Body, S0,S)).
 dcg_cbody(!, S0,S, ( !, S0 = S )).
@@ -105,6 +116,12 @@ dcg_cbody(( _ -> _ ), _,_, _) :-
    throw(error(representation_error(dcg),_)).
 
 
-term_expansion(T0, T) :-
-    nonvar(T0),
-    once(dcg_rule(T0, T)).
+term_expansion(Term0, Term) :-
+    nonvar(Term0),
+    functor(Term0, -->, 2),
+    once(dcg_rule(Term0, Term)).
+
+goal_expansion(phrase(G__0, S0), phrase(G__0, S0, [])).
+goal_expansion(phrase(G__0, S0, S), call(G_0)) :-
+    % catch(dcg_body(G__0, S0, S, G_0), error(instantiation_error,_), false).
+    catch(dcg_body(G__0, S0, S, G_0), _, false).

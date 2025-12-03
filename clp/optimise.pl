@@ -24,10 +24,10 @@ optimise(Vars, Options, Whats) :-
             retract_until_mark,
             Val0 = n(Val),
             arg(1, What, Expr),
-            append(WhatsRest, Options, Options1),
-            (   Expr #= Val,
+            list_append(WhatsRest, Options, Options1),
+            (   #Expr #= Val,
                 labeling(Options1, Vars)
-            ;   Expr #\= Val,
+            ;   #Expr #\= Val,
                 optimise(Vars, Options, Whats)
             )
         ).
@@ -40,7 +40,7 @@ retract_until_mark :-
 store_extremum(Vars, Options, What) :-
         catch((labeling(Options, Vars), throw(w(What))), w(What1), true),
         functor(What, Direction, _),
-        maplist(arg(1), [What,What1], [Expr,Expr1]),
+        list_map(arg(1), [What,What1], [Expr,Expr1]),
         optimise(Direction, Options, Vars, Expr1, Expr).
 
 optimise(Direction, Options, Vars, Expr0, Expr) :-
@@ -60,5 +60,5 @@ update_extremum(Expr) :-
         ),
         asserta(extremum(n(Expr))).
 
-tighten(min, E, V) :- E #< V.
-tighten(max, E, V) :- E #> V.
+tighten(min, E, V) :- #E #< V.
+tighten(max, E, V) :- #E #> V.

@@ -8,7 +8,7 @@
 % X in inf.. -4\/1..9\/81..sup.
 % ```
 
-#\ Q       :- reify(Q, 0).
+#\ Q :- reify(Q, 0).
 
 %% #<==>(?P, ?Q)
 %
@@ -24,7 +24,7 @@
 %
 % ```
 % vs_n_num(Vs, N, Num) :-
-%         maplist(eq_b(N), Vs, Bs),
+%         list_map(eq_b(N), Vs, Bs),
 %         sum(Bs, #=, Num).
 %
 % eq_b(X, Y, B) :- X #= Y #<==> B.
@@ -46,7 +46,7 @@
 % Z = 2.
 % ```
 
-L #<==> R  :- reify(L, B), reify(R, B).
+L #<==> R :- reify(L, B), reify(R, B).
 
 %% #==>(?P, ?Q)
 %
@@ -61,34 +61,35 @@ L #<==> R  :- reify(L, B), reify(R, B).
    %@ X in inf..sup,
    %@ Y in inf..sup.
 
-   We cannot use propagator_init_trigger/1 here because the states of
+   We cannot use `constraint_trigger/1` here because the states of
    auxiliary propagators are themselves part of the propagator.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-L #==> R   :-
-        reify(L, LB, LPs),
-        reify(R, RB, RPs),
-        append(LPs, RPs, Ps),
-        propagator_init_trigger([LB,RB], pimpl(LB,RB,Ps)).
+L #==> R :-
+    reify(L, LB, LPs),
+    reify(R, RB, RPs),
+    list_append(LPs, RPs, Ps),
+    propagator_from_constraint(pimpl(LB,RB,Ps), P),
+    propagator_trigger(P, [LB,RB]).
 
 %% #<==(?P, ?Q)
 %
 % Q implies P.
 
-L #<== R   :- R #==> L.
+L #<== R :- R #==> L.
 
 %% #/\(?P, ?Q)
 %
 % P and Q hold.
 
-L #/\ R    :- reify(L, 1), reify(R, 1).
+L #/\ R :- reify(L, 1), reify(R, 1).
 
 conjunctive_neqs_var_drep(Eqs, Var, Drep) :-
         conjunctive_neqs_var(Eqs, Var),
         phrase(conjunctive_neqs_vals(Eqs), Vals),
-        list_to_domain(Vals, Dom),
+        domain_from_numbers(Vals, Dom),
         domain_complement(Dom, C),
-        domain_to_drep(C, Drep).
+        drep_from_domain(C, Drep).
 
 conjunctive_neqs_var(V0, V) :-
     nonvar(V0),
@@ -124,16 +125,18 @@ conjunctive_neqs_vals(A #/\ B) -->
 % ```
 
 L #\/ R :-
-        (   disjunctive_eqs_var_drep(L #\/ R, Var, Drep) -> Var in Drep
-        ;   reify(L, X, Ps1),
-            reify(R, Y, Ps2),
-            propagator_init_trigger([X,Y], reified_or(X,Ps1,Y,Ps2,1))
-        ).
+    (   disjunctive_eqs_var_drep(L #\/ R, Var, Drep)
+    ->  Var in Drep
+    ;   reify(L, X, Ps1),
+        reify(R, Y, Ps2),
+        propagator_from_constraint(reified_or(X,Ps1,Y,Ps2,1), P),
+        propagator_trigger(P, [X,Y])
+    ).
 
 disjunctive_eqs_var_drep(Eqs, Var, Drep) :-
         disjunctive_eqs_var(Eqs, Var),
         phrase(disjunctive_eqs_vals(Eqs), Vals),
-        list_to_drep(Vals, Drep).
+        drep_from_numbers(Vals, Drep).
 
 disjunctive_eqs_var(V0, V) :-
     nonvar(V0),

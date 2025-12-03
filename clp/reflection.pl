@@ -6,31 +6,32 @@
 %
 %  True iff Var is a CLP(ℤ) variable.
 
-fd_var(X) :- get_attr(X, clpz, _).
+fd_var(X) :-
+    get_attr(X, clpz, _).
 
 %% fd_inf(+Var, -Inf)
 %
 %  Inf is the infimum of the current domain of Var.
 
 fd_inf(X, Inf) :-
-        (   fd_get(X, XD, _) ->
-            domain_infimum(XD, Inf0),
-            bound_portray(Inf0, Inf)
-        ;   must_be(integer, X),
-            Inf = X
-        ).
+    (   fd_get(X, XD, _)
+    ->  domain_infimum(XD, Inf0),
+        bound_to_defaulty(Inf0, Inf)
+    ;   must_be(integer, X),
+        Inf = X
+    ).
 
 %% fd_sup(+Var, -Sup)
 %
 %  Sup is the supremum of the current domain of Var.
 
 fd_sup(X, Sup) :-
-        (   fd_get(X, XD, _) ->
-            domain_supremum(XD, Sup0),
-            bound_portray(Sup0, Sup)
-        ;   must_be(integer, X),
-            Sup = X
-        ).
+    (   fd_get(X, XD, _)
+    ->  domain_supremum(XD, Sup0),
+        bound_to_defaulty(Sup0, Sup)
+    ;   must_be(integer, X),
+        Sup = X
+    ).
 
 %% fd_size(+Var, -Size)
 %
@@ -38,12 +39,12 @@ fd_sup(X, Sup) :-
 %  atom *sup* if the domain is unbounded.
 
 fd_size(X, S) :-
-        (   fd_get(X, XD, _) ->
-            domain_num_elements(XD, S0),
-            bound_portray(S0, S)
-        ;   must_be(integer, X),
-            S = 1
-        ).
+    (   fd_get(X, XD, _)
+    ->  domain_length(XD, S0),
+        bound_to_defaulty(S0, S)
+    ;   must_be(integer, X),
+        S = 1
+    ).
 
 %% fd_dom(+Var, -Dom)
 %
@@ -76,8 +77,8 @@ fd_size(X, S) :-
 % ```
 
 fd_dom(X, Drep) :-
-        (   fd_get(X, XD, _) ->
-            domain_to_drep(XD, Drep)
-        ;   must_be(integer, X),
-            Drep = X..X
-        ).
+    (   fd_get(X, XD, _)
+    ->  drep_from_domain(XD, Drep)
+    ;   must_be(integer, X),
+        Drep = X..X
+    ).

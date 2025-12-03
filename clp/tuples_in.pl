@@ -43,18 +43,31 @@
 
 tuples_in(Tuples, Relation) :-
         must_be(list(list), Tuples),
-        maplist(maplist(fd_variable), Tuples),
+        list_map(list_map(fd_variable), Tuples),
         must_be(list(list(integer)), Relation),
-        new_queue(Q0),
+        % Tuples ins inf..sup,
+        domain_from_bounds(inf, sup, D), list_map(list_map('@in'(D)), Tuples),
+        queue_empty(Q0),
         phrase(tuples_relation(Tuples, Relation), [Q0], [Q]),
-        append(Tuples, Vs),
-        variables_same_queue(Vs),
-        phrase(do_queue, [Q], _).
+        list_append(Tuples, Vs),
+        queue_unify(Vs),
+        phrase(propagator_catalyze, [Q], _).
+
+tuple_relation(Tuple, Relation) -->
+        { relation_unifiable(Relation, Tuple, Us, _, _) },
+        (   { ground(Tuple) }
+        ->  { once(member(Tuple, Relation)) }
+        ;   tuple_domain(Tuple, Us),
+            (   { Tuple = [_,_|_] }
+            ->  tuple_freeze(Tuple, Us)
+            ;   []
+            )
+        ).
 
 tuples_relation([], _) --> [].
 tuples_relation([Tuple|Tuples], Relation) -->
         { relation_unifiable(Relation, Tuple, Us, _, _) },
-        (   ground(Tuple) -> { memberchk(Tuple, Relation) }
+        (   ground(Tuple) -> { once(member(Tuple, Relation)) }
         ;   tuple_domain(Tuple, Us),
             (   Tuple = [_,_|_] -> tuple_freeze(Tuple, Us)
             ;   []
@@ -66,12 +79,14 @@ list_first_rest([L|Ls], L, Ls).
 
 tuple_domain([], _) --> [].
 tuple_domain([T|Ts], Relation0) -->
-        { maplist(list_first_rest, Relation0, Firsts, Relation1) },
+        {   list_map(list_first_rest, Relation0, Firsts0, Relation1),
+            sort(Firsts0, Firsts)
+        },
         (   Firsts = [Unique] -> T = Unique
         ;   (   var(T) ->
-                { list_to_domain(Firsts, FDom),
+                { domain_from_numbers(Firsts, FDom),
                   fd_get(T, TDom, TPs),
-                  domains_intersection(TDom, FDom, TDom1) },
+                  domain_inter(TDom, FDom, TDom1) },
                 fd_put(T, TDom1, TPs)
             ;   []
             )
@@ -79,20 +94,19 @@ tuple_domain([T|Ts], Relation0) -->
         tuple_domain(Ts, Relation1).
 
 tuple_freeze(Tuple, Relation) -->
-        (   ground(Tuple) -> { memberchk(Tuple, Relation) }
-        ;   { put_attr(R, clpz_relation, Relation),
-              make_propagator(rel_tuple(R, Tuple), Prop) },
-            tuple_freeze_(Tuple, Prop)
-        ).
+    (   { ground(Tuple) }
+    ->  { once(member(Tuple, Relation)) }
+    ;   { put_attr(R, clpz_relation, Relation),
+          propagator_from_constraint(rel_tuple(R,Tuple), P) },
+        map('@tuple_freeze'(P), Tuple)
+    ).
 
-tuple_freeze_([], _) --> [].
-tuple_freeze_([T|Ts], Prop) -->
-        (   var(T) ->
-            init_propagator_([T], Prop),
-            trigger_prop(Prop)
-        ;   []
-        ),
-        tuple_freeze_(Ts, Prop).
+'@tuple_freeze'(P, T) -->
+    (   { var(T) }
+    ->  propagator_variable(P, T),
+        propagator_queue(P)
+    ;   []
+    ).
 
 relation_unifiable([], _, [], Changed, Changed).
 relation_unifiable([R|Rs], Tuple, Us, Changed0, Changed) :-

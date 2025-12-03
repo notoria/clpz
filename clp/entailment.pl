@@ -21,7 +21,7 @@
 
 goals_entail(Goals, E) :-
         must_be(list, Goals),
-        \+ (   maplist(call, Goals), #\ E,
+        \+ (   list_map(call, Goals), #\ E,
                term_variables(Goals-E, Vs),
                label(Vs)
            ).

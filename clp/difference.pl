@@ -4,17 +4,19 @@
 
 all_different(Ls) :-
         fd_must_be_list(Ls, all_different(Ls)-1),
-        maplist(fd_variable, Ls),
-        Orig = original_goal(_, all_different(Ls)),
-        new_queue(Q0),
-        phrase((all_different(Ls, [], Orig),do_queue), [Q0], _).
+        list_map(fd_variable, Ls),
+        Ls ins inf..sup,
+        % domain_from_bounds(inf, sup, D), list_map('@in'(D), Ls),
+        Orig = original_goal(_,all_different(Ls)),
+        queue_empty(Q0),
+        phrase((all_different(Ls, [], Orig),propagator_catalyze), [Q0], _).
 
 all_different([], _, _) --> [].
 all_different([X|Right], Left, Orig) -->
         (   { var(X) } ->
-            { make_propagator(pdifferent(Left,Right,X,Orig), Prop) },
-            init_propagator_([X], Prop),
-            trigger_prop(Prop)
+            { propagator_from_constraint(pdifferent(Left,Right,X,Orig), Prop) },
+            propagator_variable(Prop, X),
+            propagator_queue(Prop)
         ;   exclude_fire(Left, Right, X)
         ),
         all_different(Right, [X|Left], Orig).
@@ -26,7 +28,7 @@ all_different([X|Right], Left, Orig) -->
 %  the following domains:
 %
 % ```
-%  ?- maplist(in, Vs,
+%  ?- list_map(in, Vs,
 %             [1\/3..4, 1..2\/4, 1..2\/4, 1..3, 1..3, 1..6]),
 %     all_distinct(Vs).
 %  false.
@@ -34,11 +36,20 @@ all_different([X|Right], Left, Orig) -->
 
 all_distinct(Ls) :-
         fd_must_be_list(Ls, all_distinct(Ls)-1),
-        maplist(fd_variable, Ls),
-        make_propagator(pdistinct(Ls), Prop),
-        new_queue(Q0),
-        phrase((distinct_attach(Ls, Prop, []),trigger_prop(Prop),do_queue), [Q0], _),
-        variables_same_queue(Ls).
+        list_map(fd_variable, Ls),
+        Ls ins inf..sup,
+        % domain_from_bounds(inf, sup, D), list_map('@in'(D), Ls),
+        propagator_from_constraint(pdistinct(Ls), Prop),
+        queue_empty(Q0),
+        phrase(
+            (   distinct_attach(Ls, Prop, []),
+                propagator_queue(Prop),
+                propagator_catalyze
+            ),
+            [Q0],
+            _
+        ),
+        queue_unify(Ls).
 
 %% nvalue(?N, +Vars).
 %
@@ -47,12 +58,15 @@ all_distinct(Ls) :-
 %  thought of as a relaxed version of all_distinct/1.
 
 nvalue(N, Vars) :-
-        fd_must_be_list(Vars),
-        maplist(fd_variable, Vars),
-        length(Vars, Len),
-        N in 0..Len,
-        zero_or_more(Vars, N),
-        propagator_init_trigger(Vars, pnvalue(N, Vars)).
+    fd_must_be_list(Vars),
+    list_map(fd_variable, Vars),
+    % domain_from_bounds(inf, sup, D), list_map('@in'(D), Vars),
+    Vars ins inf..sup,
+    list_length(Vars, Len),
+    N in 0..Len,
+    zero_or_more(Vars, N),
+    propagator_from_constraint(pnvalue(N,Vars), P),
+    propagator_trigger(P, Vars).
 
 zero_or_more([], 0).
-zero_or_more([_|_], N) :- N #> 0.
+zero_or_more([_|_], N) :- #N #> #0.

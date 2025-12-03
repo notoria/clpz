@@ -60,7 +60,7 @@ clpz_expansion(A #<==> B, Reif) :-
         clpz_builtin(F0, F),
         phrase(expr_conds(X0, X), Cs0, Cs),
         phrase(expr_conds(Y0, Y), Cs),
-        list_goal(Cs0, Cond),
+        goals_goal(',', Cs0, Cond),
         Expr =.. [F,X,Y],
         expansion_simpler(( Cond, ( var(B) ; integer(B), clpz:between(0, 1, B) ) ->
                             (   Expr ->
@@ -73,8 +73,8 @@ clpz_expansion(A #<==> B, Reif) :-
 clpz_expansion(X0 #= Y0, Equal) :-
         phrase(expr_conds(X0, X), CsX),
         phrase(expr_conds(Y0, Y), CsY),
-        list_goal(CsX, CondX),
-        list_goal(CsY, CondY),
+        goals_goal(',', CsX, CondX),
+        goals_goal(',', CsY, CondY),
         expansion_simpler(
                 (   CondX ->
                     (   var(Y) -> Y is X
@@ -90,8 +90,8 @@ clpz_expansion(X0 #= Y0, Equal) :-
 clpz_expansion(X0 #>= Y0, Geq) :-
         phrase(expr_conds(X0, X), CsX),
         phrase(expr_conds(Y0, Y), CsY),
-        list_goal(CsX, CondX),
-        list_goal(CsY, CondY),
+        goals_goal(',', CsX, CondX),
+        goals_goal(',', CsY, CondY),
         expansion_simpler(
               (   CondX ->
                   (   CondY -> X >= Y
@@ -106,8 +106,8 @@ clpz_expansion(X #< Y, Lt)    :- clpz_expansion(Y #> X, Lt).
 clpz_expansion(X0 #\= Y0, Neq) :-
         phrase(expr_conds(X0, X), CsX),
         phrase(expr_conds(Y0, Y), CsY),
-        list_goal(CsX, CondX),
-        list_goal(CsY, CondY),
+        goals_goal(',', CsX, CondX),
+        goals_goal(',', CsY, CondY),
         expansion_simpler(
               (   CondX ->
                   (   CondY -> X =\= Y
@@ -140,17 +140,17 @@ expansion_simpler((A0,B0), (A,B)) :- !,
 expansion_simpler(Var is Expr0, Goal) :-
         ground(Expr0), !,
         phrase(expr_conds(Expr0, Expr), Gs),
-        (   maplist(call, Gs) -> Value is Expr, Goal = (Var = Value)
+        (   list_map(call, Gs) -> Value is Expr, Goal = (Var = Value)
         ;   Goal = false
         ).
 expansion_simpler(Var =:= Expr0, Goal) :-
         ground(Expr0), !,
         phrase(expr_conds(Expr0, Expr), Gs),
-        (   maplist(call, Gs) -> Value is Expr, Goal = (Var =:= Value)
+        (   list_map(call, Gs) -> Value is Expr, Goal = (Var =:= Value)
         ;   Goal = false
         ).
 expansion_simpler(between:between(L,U,V), Goal) :-
-        maplist(integer, [L,U,V]),
+        list_map(integer, [L,U,V]),
         !,
         (   between(L,U,V) -> Goal = true
         ;   Goal = false

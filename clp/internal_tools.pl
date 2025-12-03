@@ -6,10 +6,10 @@
 distinct_attach([], _, _) --> [].
 distinct_attach([X|Xs], Prop, Right) -->
         (   var(X) ->
-            init_propagator_([X], Prop),
-            { make_propagator(pexclude(Xs,Right,X), P1) },
-            init_propagator_([X], P1),
-            trigger_prop(P1)
+            propagator_variable(Prop, X),
+            { propagator_from_constraint(pexclude(Xs,Right,X), P1) },
+            propagator_variable(P1, X),
+            propagator_queue(P1)
         ;   exclude_fire(Xs, Right, X)
         ),
         distinct_attach(Xs, Prop, [X|Right]).
@@ -35,30 +35,25 @@ difference_arcs(Vars, FreeLeft, FreeRight) :-
         assoc_to_list(NumVar, LsNumVar),
         pairs_values(LsNumVar, FreeRight).
 
-domain_to_list(Domain, List) :- phrase(domain_to_list(Domain), List).
-
-domain_to_list(split(_, Left, Right)) -->
-        domain_to_list(Left), domain_to_list(Right).
-domain_to_list(empty)                 --> [].
-domain_to_list(from_to(n(F),n(T)))    --> { N is T-F+1, length(Ns, N), [F|_] = Ns, chain_(succ, Ns) }, seq(Ns).
-
 difference_arcs([], []) --> [].
 difference_arcs([V|Vs], FL0) -->
-        (   { fd_get(V, Dom, _), domain_to_list(Dom, Ns) } ->
-            { FL0 = [V|FL] },
-            enumerate(Ns, V),
-            difference_arcs(Vs, FL)
-        ;   difference_arcs(Vs, FL0)
-        ).
+    (   {   fd_get(V, Dom, _),
+            domain_length(Dom, n(_)),
+            domain_to_numbers(Dom, Ns)
+        }
+    ->  { FL0 = [V|FL] },
+        enumerate(Ns, V),
+        difference_arcs(Vs, FL)
+    ;   difference_arcs(Vs, FL0)
+    ).
 
-writeln(T) :- write(T), nl.
-
-:- meta_predicate must_succeed(0).
+:- meta_predicate(must_succeed(0)).
 
 must_succeed(G) :-
-        (   call(G) -> true
-        ;   throw(failed-G)
-        ).
+    (   call(G)
+    ->  true
+    ;   throw(failed-G)
+    ).
 
 enumerate([], _) --> [].
 enumerate([N|Ns], V) -->
@@ -95,7 +90,7 @@ maximum_matching([]).
 maximum_matching([FL|FLs]) :-
         augmenting_path_to([[FL]], Levels, To),
         phrase(augmenting_path(FL, To), Path),
-        maplist(maplist(clear_parent), Levels),
+        list_map(list_map(clear_parent), Levels),
         del_attr(To, free),
         adjust_alternate_1(Path),
         maximum_matching(FLs).
@@ -158,7 +153,7 @@ adjust_alternate_0([A|Arcs]) :-
 
 g_g0(V) :-
         get_attr(V, edges, Es),
-        maplist(g_g0_(V), Es).
+        list_map(g_g0_(V), Es).
 
 g_g0_(V, flow_to(F,To)) :-
         (   get_attr(F, flow, 1) ->
@@ -169,7 +164,7 @@ g_g0_(V, flow_to(F,To)) :-
 
 g0_successors(V, Tos) :-
         (   get_attr(V, g0_edges, Tos0) ->
-            maplist(arg(2), Tos0, Tos)
+            list_map(arg(2), Tos0, Tos)
         ;   Tos = []
         ).
 
@@ -177,39 +172,47 @@ put_free(F) :- put_attr(F, free, true).
 
 free_node(F) :- get_attr(F, free, true).
 
-:- meta_predicate with_local_attributes(?, 0, ?).
+:- meta_predicate(with_local_attributes(?, 0, ?)).
 
 :- dynamic(nat_copy/1).
 
 with_local_attributes(Vars, Goal, Result) :-
-        catch((Goal,
-               % Create a copy where all attributes are removed. Only
-               % the result and its relation to Vars matters. We throw
-               % an exception to undo all modifications to attributes
-               % we made during propagation, and unify the variables
-               % in the thrown copy with Vars in order to get the
-               % intended variables in Result.
-               copy_term_nat(Vars-Result, Copy),
-               throw(local_attributes(Copy))),
-              local_attributes(Vars-Result),
-              true).
+        catch(
+            (   Goal,
+                % reset all attributes, only the result matters
+                throw(local_attributes(Result,Vars))
+            ),
+            local_attributes(Result,Vars),
+            true
+        ).
+        % catch((Goal,
+        %        % Create a copy where all attributes are removed. Only
+        %        % the result and its relation to Vars matters. We throw
+        %        % an exception to undo all modifications to attributes
+        %        % we made during propagation, and unify the variables
+        %        % in the thrown copy with Vars in order to get the
+        %        % intended variables in Result.
+        %        copy_term_nat(Vars-Result, Copy),
+        %        throw(local_attributes(Copy))),
+        %       local_attributes(Vars-Result),
+        %       true).
 
 distinct(Vars) -->
         { with_local_attributes(Vars,
            (   difference_arcs(Vars, FreeLeft, FreeRight0),
-               length(FreeLeft, LFL),
-               length(FreeRight0, LFR),
+               list_length(FreeLeft, LFL),
+               list_length(FreeRight0, LFR),
                LFL =< LFR,
-               maplist(put_free, FreeRight0),
+               list_map(put_free, FreeRight0),
                maximum_matching(FreeLeft),
                include(free_node, FreeRight0, FreeRight),
-               maplist(g_g0, FreeLeft),
+               list_map(g_g0, FreeLeft),
                scc(FreeLeft, g0_successors),
-               maplist(dfs_used, FreeRight),
+               list_map(dfs_used, FreeRight),
                phrase(distinct_goals(FreeLeft), Gs)), Gs) },
-        disable_queue,
+        queue_disable,
         neq_nums(Gs),
-        enable_queue.
+        queue_enable.
 
 neq_nums([]) --> [].
 neq_nums([neq_num(V,N)|VNs]) -->
@@ -356,7 +359,7 @@ maximal_matching([]) --> [].
 maximal_matching([FL|FLs]) -->
         (   { augmenting_path_to([[FL]], Levels, To) } ->
             { phrase(augmenting_path(FL, To), Path),
-              maplist(maplist(clear_parent), Levels),
+              list_map(list_map(clear_parent), Levels),
               del_attr(To, free),
               adjust_alternate_1(Path) },
             [FL]
@@ -364,30 +367,38 @@ maximal_matching([FL|FLs]) -->
         ),
         maximal_matching(FLs).
 
+% TODO: Move this to propagate.pl and no (#>=)/2.
+% FIXME: ?- nvalue(A, [A,A,A]). % loops
 propagate_nvalue(N, Vars0) :-
         sort(Vars0, Vars),
-        include(integer, Vars, Ints),
-        length(Ints, Distinct),
+        include(nonvar, Vars, Ints),
+        list_length(Ints, Distinct),
         vars_num_infinite(Vars, NumInfinite),
-        N #>= Distinct,
-        with_local_attributes(Vars,
-           (   difference_arcs(Vars, FreeLeft, FreeRight0),
-               maplist(put_free, FreeRight0),
-               phrase(maximal_matching(FreeLeft), MatchedLeft),
-               length(MatchedLeft, MaxFurther) ),
-            MaxFurther),
-        N #=< NumInfinite + Distinct + MaxFurther.
+        #N #>= #Distinct,
+        with_local_attributes(
+            Vars,
+            (   difference_arcs(Vars, FreeLeft, FreeRight0),
+                list_map(put_free, FreeRight0),
+                phrase(maximal_matching(FreeLeft), MatchedLeft),
+                list_length(MatchedLeft, MaxFurther)
+            ),
+            MaxFurther
+        ),
+        #N #=< #NumInfinite + #Distinct + #MaxFurther.
 
 vars_num_infinite(Vars, Num) :-
-        foldl(num_infinite, Vars, 0, Num).
+        list_foldl(num_infinite, Vars, 0, Num).
 
 num_infinite(Var, N0, N) :-
-        (   integer(Var) -> N = N0
-        ;   fd_get(Var, Dom, _),
+        (   var(Var)
+        ->  fd_get(Var, Dom, _),
             (   domain_infimum(Dom, n(_)),
-                domain_supremum(Dom, n(_)) -> N = N0
-            ;   #N #= N0 + 1
+                domain_supremum(Dom, n(_))
+            ->  N = N0
+            ;   integer_add(1, N0, N) % #N #= #N0 + #1
             )
+        ;   integer(Var),
+            N = N0
         ).
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -401,19 +412,21 @@ num_infinite(Var, N0, N) :-
 
 weak_arc_all_distinct(Ls) :-
         must_be(list, Ls),
-        Orig = original_goal(_, weak_arc_all_distinct(Ls)),
+        Orig = original_goal(_,weak_arc_all_distinct(Ls)),
         all_distinct(Ls, [], Orig).
 
 all_distinct([], _, _).
 all_distinct([X|Right], Left, Orig) :-
         %\+ list_contains(Right, X),
         (   var(X) ->
-            make_propagator(weak_distinct(Left,Right,X,Orig), Prop),
-            init_propagator(X, Prop),
-            trigger_prop(Prop)
-%             make_propagator(check_distinct(Left,Right,X), Prop2),
-%             init_propagator(X, Prop2),
-%             trigger_prop(Prop2)
+            propagator_from_constraint(weak_distinct(Left,Right,X,Orig), Prop),
+            propagator_variable(Prop, X),
+            % propagator_queue(Prop)
+            propagator_trigger(Prop, [])
+%             propagator_from_constraint(check_distinct(Left,Right,X), Prop2),
+%             propagator_variable(Prop2, X),
+%             % propagator_queue(Prop2)
+%             propagator_trigger(Prop2, [])
         ;   exclude_fire(Left, Right, X)
         ),
         outof_reducer(Left, Right, X),
@@ -433,7 +446,7 @@ list_contains([X|Xs], Y) :-
         ).
 
 kill_if_isolated(Left, Right, X, MState) :-
-        append(Left, Right, Others),
+        list_append(Left, Right, Others),
         fd_get(X, XDom, _),
         (   all_empty_intersection(Others, XDom) -> kill(MState)
         ;   true
@@ -442,17 +455,18 @@ kill_if_isolated(Left, Right, X, MState) :-
 all_empty_intersection([], _).
 all_empty_intersection([V|Vs], XDom) :-
         (   fd_get(V, VDom, _) ->
-            domains_intersection_(VDom, XDom, empty),
+            domain_inter(VDom, XDom, _XDom),
+            domain_empty(_XDom),
             all_empty_intersection(Vs, XDom)
         ;   all_empty_intersection(Vs, XDom)
         ).
 
 outof_reducer(Left, Right, Var) :-
         (   fd_get(Var, Dom, _) ->
-            append(Left, Right, Others),
-            domain_num_elements(Dom, N),
+            list_append(Left, Right, Others),
+            domain_length(Dom, N),
             num_subsets(Others, Dom, 0, Num, NonSubs),
-            (   n(Num) cis_geq N -> false
+            (   n(Num) cis_ge N -> false
             ;   n(Num) cis N - n(1) ->
                 reduce_from_others(NonSubs, Dom)
             ;   true

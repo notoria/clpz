@@ -1,23 +1,8 @@
-can_be(What, Term) :-
-    (   var(Term)
-    ->  true
-    ;   must_be(What, Term)
-    ).
+% instantiation_error(Ctx) :-
+%     throw(error(instantiation_error,Ctx)).
 
-error:must_be(integer, T) :-
-    (   var(T)
-    ->  throw(error(instantiation_error,must_be/2))
-    ;   integer(T)
-    ->  true
-    ;   throw(error(type_error(integer,T),must_be/2))
-    ).
+type_error(Type, Term, Ctx) :-
+    throw(error(type_error(Type,Term),Ctx)).
 
-% instantiation_error(Where) :-
-%     throw(error(instantiation_error,Where)).
-
-type_error(Type, Term, Where) :-
-    throw(error(type_error(Type,Term),Where)).
-
-domain_error(Type, Term, Where) :-
-    throw(error(domain_error(Type,Term),Where)).
-
+domain_error(Domain, Term, Ctx) :-
+    throw(error(domain_error(Domain,Term),Ctx)).

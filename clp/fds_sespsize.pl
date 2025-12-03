@@ -7,13 +7,13 @@
 
 fds_sespsize(Vs, S) :-
         must_be(list, Vs),
-        maplist(fd_variable, Vs),
+        list_map(fd_variable, Vs),
         fds_sespsize(Vs, n(1), S1),
-        bound_portray(S1, S).
+        bound_to_defaulty(S1, S).
 
 fd_size_(V, S) :-
         (   fd_get(V, D, _) ->
-            domain_num_elements(D, S)
+            domain_length(D, S)
         ;   S = n(1)
         ).
 

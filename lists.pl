@@ -1,4 +1,10 @@
 :- include("core").
+:- include("list").
+
+% goal_expansion(list_map(G_1, Es), maplist(G_1, Es)).
+% goal_expansion(list_map(G_2, Es0, Es), maplist(G_2, Es0, Es)).
+% goal_expansion(list_map(G_3, Es0, Es1, Es), maplist(G_3, Es0, Es1, Es)).
+% goal_expansion(list_map(G_4, Es0, Es1, Es2, Es), maplist(G_4, Es0, Es1, Es2, Es)).
 
 append([], []).
 append([Es0|Ess], Es) :-
@@ -64,9 +70,9 @@ maplist(G_3, [E0|Es0], [E1|Es1], [E|Es]) :-
 
 list_si(Es0) :-
     '$skip_max_list'(_, _, Es0, Es),
-    (   nonvar(Es)
-    ->  Es = []
-    ;   throw(error(instantiation_error,list_si/1))
+    (   var(Es)
+    ->  throw(error(instantiation_error,list_si/1))
+    ;   Es = []
     ).
 
 same_length([], []).
@@ -116,3 +122,6 @@ sum_list(Es, S) :-
 
 sum_(E, S0, S) :-
     S is E+S0.
+
+transpose(Lss, Tss) :-
+    list_transpose(Lss, Tss).

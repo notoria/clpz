@@ -58,8 +58,8 @@ list_chain(R_2, [E|Es]) :-
 % list_element([_|Es], E) :-
 %     list_element(Es, E).
 
-list_element(Es, E) :-
-    '@list_element'(Es, E).
+list_element([E|Es], E0) :-
+    '@list_element'(Es, E, E0).
 
 '@list_element'(_, E, E).
 '@list_element'([E|Es], _, E0) :-
@@ -72,13 +72,18 @@ list_last([], E, E).
 list_last([E0|Es], _, E) :-
     list_last(Es, E0, E).
 
+% list_last([E0|Es], E) :-
+%     list_foldl('@list_last', Es, E0, E).
+% 
+% '@list_last'(E, _, E).
+
 list_length(Es, N) :-
     (   var(N)
-    ->  '@list_length'(Es, 0, N)
-    ;   integer(N)
-    ->  N @>= 0,
-        '@list_length'(Es, 0, N)
-    ).
+    ->  true
+    ;   integer(N),
+        N @>= 0
+    ),
+    '@list_length'(Es, 0, N).
 
 '@list_length'(Es, N0, N) :-
     (   N0 == N
@@ -91,27 +96,44 @@ list_length(Es, N) :-
     succ(N0, N1),
     '@list_length'(Es, N1, N).
 
-list_nth0(N, Es0, E) :-
-    list_nth0(N, Es0, E, _).
+list_nth0(N, Es, E) :-
+    (   var(N)
+    ->  true
+    ;   integer(N)
+    ),
+    list_skip(N, Es, [E|_]).
 
 list_nth0(N, Es0, E, Es) :-
     (   var(N)
-    ->  '@list_nth0'(E, 0, N, Es0, Es)
-    ;   integer(N),
-        '@list_nth0'(E, 0, N, Es0, Es1),
-        Es = Es1
-    ).
+    ->  true
+    ;   integer(N)
+    ),
+    '@list_nth0'(0, N, E, Es0, Es).
 
-'@list_nth0'(E, N0, N, Es0, Es) :-
+'@list_nth0'(N0, N, E, Es0, Es) :-
     (   N0 == N
     ->  [E|Es] = Es0
-    ;   '@@list_nth0'(E, N0, N, Es0, Es)
+    ;   '@@list_nth0'(N0, N, E, Es0, Es)
     ).
 
-'@@list_nth0'(E, N, N, [E|Es], Es).
-'@@list_nth0'(E, N0, N, [_|Es0], Es) :-
+'@@list_nth0'(N, N, E, [E|Es], Es).
+'@@list_nth0'(N0, N, E, [E0|Es1], [E0|Es]) :-
     succ(N0, N1),
-    '@list_nth0'(E, N1, N, Es0, Es).
+    '@list_nth0'(N1, N, E, Es1, Es).
+
+list_skip(N, Es0, Es) :-
+    '@list_skip'(0, N, Es0, Es).
+
+'@list_skip'(N0, N, Es0, Es) :-
+    (   N0 == N
+    ->  Es = Es0
+    ;   '@@list_skip'(N0, N, Es0, Es)
+    ).
+
+'@@list_skip'(N, N, Es, Es).
+'@@list_skip'(N0, N, [_|Es1], Es) :-
+    succ(N0, N1),
+    '@list_skip'(N1, N, Es1, Es).
 
 % list_reversed(Es0, Es) :-
 %     list_equisized(Es0, Es),

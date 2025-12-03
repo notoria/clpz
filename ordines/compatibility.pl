@@ -2,17 +2,87 @@
   Compatibility predicates.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+:- include("../core").
+:- include("../assoc").
+:- include("../list").
+:- include("../pair").
+% :- include("../lists").
+:- include("../atts").
+:- include("../dcg").
+:- include("../error").
+:- include("../freeze").
+
+between(L, _, _) :-
+    var(L),
+    throw(error(instantiation_error,between/3)).
+between(_, U, _) :-
+    var(U),
+    throw(error(instantiation_error,between/3)).
+between(L, U, N) :-
+    integer(L),
+    integer(U),
+    (   var(N)
+    ->  L @=< U,
+        '@between'(L, U, N)
+    ;   integer(N),
+        L @=< N,
+        N @=< U
+    ).
+
+'@between'(L, U, N) :-
+    (   L = U
+    ->  U = N
+    ;   L = N
+    ;   M is L+1,
+        '@between'(M, U, N)
+    ).
+
+member(E, Es) :-
+    list_element(Es, E).
+
 seq([]) --> [].
 seq([E|Es]) --> [E], seq(Es).
+
+list_si(Es0) :-
+    '$skip_max_list'(_, _, Es0, Es),
+    '@list_si'(Es).
+
+'@list_si'(Es) :-
+    var(Es),
+    throw(error(instantiation_error,list_si/1)).
+'@list_si'(Es) :-
+    Es \= [],
+    throw(error(type_error(list,Es),list_si/1)).
+'@list_si'([]).
 
 cyclic_term(T) :-
         \+ acyclic_term(T).
 
+must_be(Term, Type, Goal, Arg) :-
+    var(Type),
+    throw(error(instantiation_error,instantiation_error(must_be(Term, Type, Goal, Arg),2))).
+must_be(Term, Type, Goal, Arg) :-
+    var(Goal),
+    throw(error(instantiation_error,instantiation_error(must_be(Term, Type, Goal, Arg),3))).
+must_be(Term, Type, Goal, Arg) :-
+    var(Arg),
+    throw(error(instantiation_error,instantiation_error(must_be(Term, Type, Goal, Arg),4))).
+must_be(Term, Type, Goal, Arg) :-
+    \+ integer(Arg),
+    throw(error(type_error(integer,Term),type_error(must_be(Term, Type, Goal, Arg),4))).
+must_be(Term, _, Goal, Arg) :-
+    var(Term),
+    throw(error(instantiation_error,instantiation_error(Goal,Arg))).
+must_be(Term, integer, Goal, Arg) :-
+    \+ integer(Term),
+    throw(error(type_error(integer,Term),type_error(Goal,Arg))).
+must_be(_, _, _, _).
+
 must_be(What, Term) :- must_be(What, unknown(Term)-1, Term).
 
-must_be(Type, _, Term) :-
+must_be(Type, Goal-Arg, Term) :-
         \+ member(Type, [ground,acyclic,list,list(_)]),
-        error:must_be(Type, Term).
+        must_be(Term, Type, Goal, Arg).
 must_be(ground, _, Term) :-
         (   ground(Term) -> true
         ;   instantiation_error(Term)
@@ -28,7 +98,7 @@ must_be(list, Where, Term) :-
         ).
 must_be(list(What), Where, Term) :-
         must_be(list, Where, Term),
-        maplist(must_be(What, Where), Term).
+        list_map(must_be(What, Where), Term).
 
 
 instantiation_error(Term) :- instantiation_error(Term, unknown(Term)-1).
@@ -63,6 +133,7 @@ partition_(=, X, O_2, Xs, Ls, [X|Es], Gs) :-
 partition_(>, X, O_2, Xs, Ls, Es, [X|Gs]) :-
     partition(O_2, Xs, Ls, Es, Gs).
 
+
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    include/3 and exclude/3
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -88,3 +159,6 @@ exclude(Goal, [L|Ls0], Ls) :-
         exclude(Goal, Ls0, Rest).
 
 %:- discontiguous clpz:goal_expansion/5.
+
+uniques(Es0, Es) :-
+    '$uniques'(Es0, Es).

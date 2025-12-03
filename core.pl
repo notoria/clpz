@@ -1,4 +1,3 @@
-:- op(1199,  fx, meta_predicate).
 :- op(1199,  fx, attribute).
 :- op( 600, xfy, :).
 :- op( 500, yfx, xor).
@@ -19,6 +18,9 @@
 
 copy_term_nat(T0, T) :-
     copy_term(T0, T).
+
+% copy_term(T0, T) :-
+%     findall(T0, true, [T]).
 
 term_compare(R, X0, Y0, X, Y) :-
     term_compare(R, X0, Y0),
@@ -42,23 +44,4 @@ expand_term(T0, T) :-
     ;   T = T0
     ).
 
-:- op( 950,  fx, *). *(_).
-
-between(L, U, N) :-
-    must_be(integer, L),
-    must_be(integer, U),
-    can_be(integer, N),
-    (   var(N)
-    ->  L @=< U,
-        '@between'(L, U, N)
-    ;   L @=< N,
-        N @=< U
-    ).
-
-'@between'(L, U, N) :-
-    (   L = U
-    ->  U = N
-    ;   L = N
-    ;   succ(L, M),
-        '@between'(M, U, N)
-    ).
+% :- op( 950,  fx, *). *(_). goal_expansion(*_, true).

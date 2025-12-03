@@ -1,34 +1,36 @@
-%run_propagator(P, _) --> { portray_clause(run_propagator(P)), false }.
+%propagate(P, _) --> { portray_clause(propagate(P)), false }.
 % trivial propagator, used only to remember pending constraints
-run_propagator(presidual(_), _) --> [].
+propagate(presidual(_), _) --> [].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-run_propagator(pdifferent(Left,Right,X,_), MState) -->
-        run_propagator(pexclude(Left,Right,X), MState).
+propagate(pdifferent(Left,Right,X,_), MState) -->
+        propagate(pexclude(Left,Right,X), MState).
 
-run_propagator(pexclude(Left,Right,X), _) -->
+propagate(pexclude(Left,Right,X), _) -->
         (   ground(X) ->
-            disable_queue,
+            queue_disable,
             exclude_fire(Left, Right, X),
-            enable_queue
+            queue_enable
         ;   true
         ).
 
-run_propagator(pdistinct(Ls), _MState) --> distinct(Ls).
+propagate(pdistinct(Ls), _MState) --> distinct(Ls).
 
-run_propagator(pnvalue(N, Vars), _MState) --> { propagate_nvalue(N, Vars) }.
+propagate(pnvalue(N, Vars), _MState) --> { propagate_nvalue(N, Vars) }.
 
-run_propagator(check_distinct(Left,Right,X), _) -->
-        { \+ list_contains(Left, X),
-          \+ list_contains(Right, X) }.
+propagate(check_distinct(Left,Right,X), _) -->
+    { list_map(\==(X), Left), list_map(\==(X), Right) }.
+        % { \+ list_contains(Left, X),
+        %   \+ list_contains(Right, X) }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-run_propagator(pelement(N, Is, V), MState) -->
+propagate(pelement(N, Is, V), MState) -->
         (   { fd_get(N, NDom, _) } ->
             (   { fd_get(V, VDom, VPs) } ->
-                { integers_remaining(Is, 1, NDom, empty, VDom1),
-                  domains_intersection(VDom, VDom1, VDom2) },
+                { domain_empty(Empty),
+                  integers_remaining(Is, 1, NDom, Empty, VDom1),
+                  domain_inter(VDom, VDom1, VDom2) },
                 fd_put(V, VDom2, VPs)
             ;   []
             )
@@ -37,47 +39,49 @@ run_propagator(pelement(N, Is, V), MState) -->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-run_propagator(pgcc_single(Vs, Pairs), _) --> gcc_global(Vs, Pairs).
+propagate(pgcc_single(Vs, Pairs), _) --> gcc_global(Vs, Pairs).
 
-run_propagator(pgcc_check_single(Pairs), _) --> gcc_check(Pairs).
+propagate(pgcc_check_single(Pairs), _) --> gcc_check(Pairs).
 
-run_propagator(pgcc_check(Pairs), _) --> gcc_check(Pairs).
+propagate(pgcc_check(Pairs), _) --> gcc_check(Pairs).
 
-run_propagator(pgcc(Vs, _, Pairs), _) --> gcc_global(Vs, Pairs).
+propagate(pgcc(Vs, _, Pairs), _) --> gcc_global(Vs, Pairs).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-run_propagator(pcircuit(Vs), _MState) -->
+propagate(pcircuit(Vs), _MState) -->
         distinct(Vs),
         { propagate_circuit(Vs) }.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-run_propagator(pgeq(A,B), MState) -->
+propagate(pleq(B,A), MState) -->
         (   A == B -> kill(MState)
         ;   nonvar(A) ->
             (   nonvar(B) -> kill(MState), A >= B
             ;   { fd_get(B, BD, BPs),
-                  domain_remove_greater_than(BD, A, BD1) },
+                  domain_remove_greater_than(A, BD, BD1) },
                 kill(MState),
                 fd_put(B, BD1, BPs)
             )
         ;   nonvar(B) ->
             { fd_get(A, AD, APs),
-              domain_remove_smaller_than(AD, B, AD1) },
+              domain_remove_less_than(B, AD, AD1) },
             kill(MState),
             fd_put(A, AD1, APs)
         ;   { fd_get(A, AD, AL, AU, APs),
               fd_get(B, _, BL, BU, _),
-              AU cis_geq BL },
-            (   { AL cis_geq BU } -> kill(MState)
+              AU cis_ge BL },
+            (   { AL cis_ge BU } -> kill(MState)
             ;   AU == BL -> kill(MState), A = B
             ;   { NAL cis max(AL,BL),
-                  domains_intersection(AD, from_to(NAL,AU), NAD) },
+                  domain_from_bounds(NAL, AU, _D0),
+                  domain_inter(AD, _D0, NAD) },
                 fd_put(A, NAD, APs),
                 (   { fd_get(B, BD2, BL2, BU2, BPs2) } ->
                     { NBU cis min(BU2, AU),
-                      domains_intersection(BD2, from_to(BL2,NBU), NBD) },
+                      domain_from_bounds(BL2, NBU, _D1),
+                      domain_inter(BD2, _D1, NBD) },
                     fd_put(B, NBD, BPs2)
                 ;   []
                 )
@@ -86,12 +90,12 @@ run_propagator(pgeq(A,B), MState) -->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-run_propagator(rel_tuple(R, Tuple), MState) -->
+propagate(rel_tuple(R, Tuple), MState) -->
         { get_attr(R, clpz_relation, Relation) },
         (   { ground(Tuple) } ->
             kill(MState),
             { del_attr(R, clpz_relation),
-              memberchk(Tuple, Relation) }
+              once(member(Tuple, Relation)) }
         ;   { relation_unifiable(Relation, Tuple, Us, false, Changed),
               Us = [_|_] },
             (   { Tuple = [First,Second], ( ground(First) ; ground(Second) ) } ->
@@ -104,16 +108,16 @@ run_propagator(rel_tuple(R, Tuple), MState) -->
                 Single = Tuple
             ;   { call(Changed) } ->
                 { put_attr(R, clpz_relation, Us) },
-                disable_queue,
+                queue_disable,
                 tuple_domain(Tuple, Us),
-                enable_queue
+                queue_enable
             ;   []
             )
         ).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-run_propagator(pserialized(S_I, D_I, S_J, D_J, _), MState) -->
+propagate(pserialized(S_I, D_I, S_J, D_J, _), MState) -->
         (   nonvar(S_I), nonvar(S_J) ->
             kill(MState),
             (   S_I + D_I =< S_J -> []
@@ -126,15 +130,15 @@ run_propagator(pserialized(S_I, D_I, S_J, D_J, _), MState) -->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % X #\= Y
-run_propagator(pneq(A, B), MState) -->
+propagate(pneq(A, B), MState) -->
         (   nonvar(A) ->
             (   nonvar(B) -> A =\= B, kill(MState)
             ;   { fd_get(B, BD0, BExp0),
-                  domain_remove(BD0, A, BD1),
+                  domain_remove(A, BD0, BD1),
                   kill(MState) },
                 fd_put(B, BD1, BExp0)
             )
-        ;   nonvar(B) -> run_propagator(pneq(B, A), MState)
+        ;   nonvar(B) -> propagate(pneq(B, A), MState)
         ;   A \== B,
             { fd_get(A, _, AI, AS, _),
               fd_get(B, _, BI, BS, _) },
@@ -146,7 +150,7 @@ run_propagator(pneq(A, B), MState) -->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Y = abs(X)
-run_propagator(pabs(X,Y), MState) -->
+propagate(iabs(X,Y), MState) -->
         (   nonvar(X) -> kill(MState), Y is abs(X)
         ;   nonvar(Y) ->
             kill(MState),
@@ -156,22 +160,22 @@ run_propagator(pabs(X,Y), MState) -->
         ;   X == Y -> kill(MState)
         ;   { fd_get(X, XD, XPs),
               fd_get(Y, YD, _),
-              domain_negate(YD, YDNegative),
-              domains_union(YD, YDNegative, XD1),
-              domains_intersection(XD, XD1, XD2) },
+              domain_expand(-1, YD, YDNegative),
+              domain_union(YD, YDNegative, XD1),
+              domain_inter(XD, XD1, XD2) },
             fd_put(X, XD2, XPs),
             (   { fd_get(Y, YD1, YPs1) } ->
-                { domain_negate(XD2, XD2Neg),
-                  domains_union(XD2, XD2Neg, YD2),
-                  domain_remove_smaller_than(YD2, 0, YD3),
-                  domains_intersection(YD1, YD3, YD4) },
+                { domain_expand(-1, XD2, XD2Neg),
+                  domain_union(XD2, XD2Neg, YD2),
+                  domain_remove_less_than(0, YD2, YD3),
+                  domain_inter(YD1, YD3, YD4) },
                 fd_put(Y, YD4, YPs1)
             ;   []
             )
         ).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % abs(X-Y) #\= C
-run_propagator(absdiff_neq(X,Y,C), MState) -->
+propagate(absdiff_neq(X,Y,C), MState) -->
         (   C < 0 -> kill(MState)
         ;   nonvar(X) ->
             kill(MState),
@@ -187,7 +191,7 @@ run_propagator(absdiff_neq(X,Y,C), MState) -->
 
 
 % X #= abs(X) + V
-run_propagator(x_eq_abs_plus_v(X,V), MState) -->
+propagate(x_eq_abs_plus_v(X,V), MState) -->
         (   nonvar(V) ->
             (   V =:= 0 -> kill(MState), { X in 0..sup }
             ;   V < 0 -> kill(MState), { X #= V / 2 }
@@ -200,7 +204,7 @@ run_propagator(x_eq_abs_plus_v(X,V), MState) -->
         ).
 
 % X #\= Y + Z
-run_propagator(x_neq_y_plus_z(X,Y,Z), MState) -->
+propagate(x_neq_y_plus_z(X,Y,Z), MState) -->
         (   nonvar(X) ->
             (   nonvar(Y) ->
                 (   nonvar(Z) -> kill(MState), X =\= Y + Z
@@ -220,34 +224,34 @@ run_propagator(x_neq_y_plus_z(X,Y,Z), MState) -->
         ).
 
 % X #=< Y + C
-run_propagator(x_leq_y_plus_c(X,Y,C), MState) -->
+propagate(x_leq_y_plus_c(X,Y,C), MState) -->
         (   nonvar(X) ->
             (   nonvar(Y) -> kill(MState), X =< Y + C
             ;   kill(MState),
                 R is X - C,
                 { fd_get(Y, YD, YPs),
-                  domain_remove_smaller_than(YD, R, YD1) },
+                  domain_remove_less_than(R, YD, YD1) },
                 fd_put(Y, YD1, YPs)
             )
         ;   nonvar(Y) ->
             kill(MState),
             R is Y + C,
             { fd_get(X, XD, XPs),
-              domain_remove_greater_than(XD, R, XD1) },
+              domain_remove_greater_than(R, XD, XD1) },
             fd_put(X, XD1, XPs)
         ;   (   X == Y -> C >= 0, kill(MState)
             ;   { fd_get(Y, YD, _) },
                 (   { domain_supremum(YD, n(YSup)) } ->
                     YS1 is YSup + C,
                     { fd_get(X, XD, XPs),
-                      domain_remove_greater_than(XD, YS1, XD1) },
+                      domain_remove_greater_than(YS1, XD, XD1) },
                     fd_put(X, XD1, XPs)
                 ;   []
                 ),
                 (   { fd_get(X, XD2, _), domain_infimum(XD2, n(XInf)) } ->
                     XI1 is XInf - C,
                     (   { fd_get(Y, YD1, YPs1) } ->
-                        { domain_remove_smaller_than(YD1, XI1, YD2),
+                        { domain_remove_less_than(XI1, YD1, YD2),
                           (   domain_infimum(YD2, n(YInf)),
                               domain_supremum(XD2, n(XSup)),
                               XSup =< YInf + C ->
@@ -262,7 +266,7 @@ run_propagator(x_leq_y_plus_c(X,Y,C), MState) -->
             )
         ).
 
-run_propagator(scalar_product_neq(Cs0,Vs0,P0), MState) -->
+propagate(scalar_product_neq(Cs0,Vs0,P0), MState) -->
         { coeffs_variables_const(Cs0, Vs0, Cs, Vs, 0, I),
           P is P0 - I,
           (   Vs = [] -> kill(MState), P =\= 0
@@ -282,13 +286,13 @@ run_propagator(scalar_product_neq(Cs0,Vs0,P0), MState) -->
           ;   true
           ) }.
 
-run_propagator(scalar_product_leq(Cs0,Vs0,P0), MState) -->
+propagate(scalar_product_leq(Cs0,Vs0,P0), MState) -->
         { coeffs_variables_const(Cs0, Vs0, Cs, Vs, 0, I) },
         P is P0 - I,
         (   Vs = [] -> kill(MState), P >= 0
         ;   { duophrase(sum_finite_domains(Cs, Vs, 0, 0, Inf, Sup), Infs, Sups) },
             D1 is P - Inf,
-            disable_queue,
+            queue_disable,
             (   Infs == [], Sups == [] ->
                 Inf =< P,
                 (   Sup =< P -> kill(MState)
@@ -298,10 +302,10 @@ run_propagator(scalar_product_leq(Cs0,Vs0,P0), MState) -->
             ;   Infs = [_] -> remove_upper(Infs, D1)
             ;   true
             ),
-            enable_queue
+            queue_enable
         ).
 
-run_propagator(scalar_product_eq(Cs0,Vs0,P0), MState) -->
+propagate(scalar_product_eq(Cs0,Vs0,P0), MState) -->
         { coeffs_variables_const(Cs0, Vs0, Cs, Vs, 0, I) },
         P is P0 - I,
         (   Vs = [] -> kill(MState), P =:= 0
@@ -317,7 +321,7 @@ run_propagator(scalar_product_eq(Cs0,Vs0,P0), MState) -->
             % { nl, writeln(Infs-Sups-Inf-Sup) },
             D1 is P - Inf,
             D2 is Sup - P,
-            disable_queue,
+            queue_disable,
             (   Infs == [], Sups == [] ->
                 { between(Inf, Sup, P) },
                 remove_dist_upper_lower(Cs, Vs, D1, D2)
@@ -330,11 +334,11 @@ run_propagator(scalar_product_eq(Cs0,Vs0,P0), MState) -->
             ;   Sups = [_] -> remove_lower(Sups, D2)
             ;   true
             ),
-            enable_queue
+            queue_enable
         ).
 
 % X + Y = Z
-run_propagator(pplus(X,Y,Z), MState) -->
+propagate(iadd(X,Y,Z), MState) -->
         (   nonvar(X) ->
             (   X =:= 0 -> kill(MState), Y = Z
             ;   Y == Z -> kill(MState), X =:= 0
@@ -342,30 +346,30 @@ run_propagator(pplus(X,Y,Z), MState) -->
             ;   nonvar(Z) -> kill(MState), Y is Z - X
             ;   { fd_get(Z, ZD, ZPs),
                   fd_get(Y, YD, _),
-                  domain_shift(YD, X, Shifted_YD),
-                  domains_intersection(ZD, Shifted_YD, ZD1) },
+                  domain_shift(X, YD, Shifted_YD),
+                  domain_inter(ZD, Shifted_YD, ZD1) },
                 fd_put(Z, ZD1, ZPs),
                 (   { fd_get(Y, YD1, YPs) } ->
                     O is -X,
-                    { domain_shift(ZD1, O, YD2),
-                      domains_intersection(YD1, YD2, YD3) },
+                    { domain_shift(O, ZD1, YD2),
+                      domain_inter(YD1, YD2, YD3) },
                     fd_put(Y, YD3, YPs)
                 ;   []
                 )
             )
-        ;   nonvar(Y) -> run_propagator(pplus(Y,X,Z), MState)
+        ;   nonvar(Y) -> propagate(iadd(Y,X,Z), MState)
         ;   nonvar(Z) ->
             (   X == Y -> kill(MState), { even(Z), X is Z // 2 }
             ;   { fd_get(X, XD, _),
                   fd_get(Y, YD, YPs),
-                  domain_negate(XD, XDN),
-                  domain_shift(XDN, Z, YD1),
-                  domains_intersection(YD, YD1, YD2) },
+                  domain_expand(-1, XD, XDN),
+                  domain_shift(Z, XDN, YD1),
+                  domain_inter(YD, YD1, YD2) },
                 fd_put(Y, YD2, YPs),
                 (   { fd_get(X, XD1, XPs) } ->
-                    { domain_negate(YD2, YD2N),
-                      domain_shift(YD2N, Z, XD2),
-                      domains_intersection(XD1, XD2, XD3) },
+                    { domain_expand(-1, YD2, YD2N),
+                      domain_shift(Z, YD2N, XD2),
+                      domain_inter(XD1, XD2, XD3) },
                       fd_put(X, XD3, XPs)
                 ;   []
                 )
@@ -396,7 +400,7 @@ run_propagator(pplus(X,Y,Z), MState) -->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-run_propagator(ptimes(X,Y,Z), MState) -->
+propagate(imul(X,Y,Z), MState) -->
         (   nonvar(X) ->
             (   nonvar(Y) -> kill(MState), Z is X * Y
             ;   X =:= 0 -> kill(MState), Z = 0
@@ -406,17 +410,17 @@ run_propagator(ptimes(X,Y,Z), MState) -->
                 ;   { fd_get(Y, YD, _),
                       fd_get(Z, ZD, ZPs),
                       domain_expand(YD, X, Scaled_YD),
-                      domains_intersection(ZD, Scaled_YD, ZD1) },
+                      domain_inter(ZD, Scaled_YD, ZD1) },
                     fd_put(Z, ZD1, ZPs),
                     (   { fd_get(Y, YDom2, YPs2) } ->
                         { domain_contract(ZD1, X, Contract),
-                          domains_intersection(YDom2, Contract, NYDom) },
+                          domain_inter(YDom2, Contract, NYDom) },
                         fd_put(Y, NYDom, YPs2)
                     ;   kill(MState), Z is X * Y
                     )
                 )
             )
-        ;   nonvar(Y) -> run_propagator(ptimes(Y,X,Z), MState)
+        ;   nonvar(Y) -> propagate(imul(Y,X,Z), MState)
         ;   nonvar(Z) ->
             (   X == Y ->
                 kill(MState),
@@ -442,7 +446,7 @@ run_propagator(ptimes(X,Y,Z), MState) -->
                 ;  neq_num(X, 0), neq_num(Y, 0)
                 )
             )
-        ;   (   X == Y -> kill(MState), { X^2 #= Z }
+        ;   (   X == Y -> kill(MState), { #X^2 #= #Z }
             ;   { fd_get(X, XD, XL, XU, XPs),
                   fd_get(Y, _, YL, YU, _),
                   fd_get(Z, ZD, ZL, ZU, _) },
@@ -458,8 +462,8 @@ run_propagator(ptimes(X,Y,Z), MState) -->
                     (   { fd_get(Z, ZD2, ZL2, ZU2, ZPs2) } ->
                         { min_product(NXL, NXU, NYL, NYU, NZL),
                           max_product(NXL, NXU, NYL, NYU, NZU) },
-                        (   { NZL cis_leq ZL2, NZU cis_geq ZU2 } -> ZD3 = ZD2
-                        ;   { domains_intersection(ZD2, from_to(NZL,NZU), ZD3) },
+                        (   { NZL cis_le ZL2, NZU cis_ge ZU2 } -> ZD3 = ZD2
+                        ;   { domain_from_bounds(NZL, NZU, _D2), domain_inter(ZD2, _D2, ZD3) },
                             fd_put(Z, ZD3, ZPs2)
                         ),
                         (   { domain_contains(ZD3, 0) } -> []
@@ -474,7 +478,7 @@ run_propagator(ptimes(X,Y,Z), MState) -->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % X // Y = Z (round towards zero)
-run_propagator(ptzdiv(X,Y,Z), MState) -->
+propagate(ptzdiv(X,Y,Z), MState) -->
         (   nonvar(X) ->
             (   nonvar(Y) -> kill(MState), Y =\= 0, Z is X // Y
             ;   { fd_get(Y, YD, YL, YU, YPs) },
@@ -482,9 +486,16 @@ run_propagator(ptzdiv(X,Y,Z), MState) -->
                     (   Z =:= 0 ->
                         NYL is -abs(X) - 1,
                         NYU is abs(X) + 1,
-                        { domains_intersection(YD, split(0, from_to(inf,n(NYL)),
-                                                       from_to(n(NYU), sup)),
-                                             NYD) },
+                        { domain_from_bounds(inf, n(NYL), __D0),
+                          domain_from_bounds(n(NYU), sup, __D1),
+                          domain_union(__D0, __D1, __D2)
+                        },
+                        { domain_inter(
+                            YD,
+                            % split(0,from_to(inf,n(NYL)),from_to(n(NYU),sup)),
+                            __D2,
+                            NYD
+                          ) },
                         fd_put(Y, NYD, YPs)
                     ;   (   sign(X) =:= sign(Z) ->
                             { NYL cis max(n(X) // (n(Z)+sign(n(Z))) + n(1), YL),
@@ -509,7 +520,8 @@ run_propagator(ptzdiv(X,Y,Z), MState) -->
                     (   { X >= 0, NZL cis_gt n(0), fd_get(Y, YD1, YPs1) } ->
                         { NYL cis n(X) // (NZU + n(1)) + n(1),
                           NYU cis n(X) // NZL,
-                          domains_intersection(YD1, from_to(NYL, NYU), NYD1) },
+                          domain_from_bounds(NYL, NYU, _D3),
+                          domain_inter(YD1, _D3, NYD1) },
                         fd_put(Y, NYD1, YPs1)
                     ;   true
                     )
@@ -534,11 +546,11 @@ run_propagator(ptzdiv(X,Y,Z), MState) -->
                     update_bounds(X, XD, XPs, XL, XU, NXL, NXU)
                 ;   { fd_get(Z, ZD, ZPs),
                       domain_contract_less(XD, Y, Contracted),
-                      domains_intersection(ZD, Contracted, NZD) },
+                      domain_inter(ZD, Contracted, NZD) },
                     fd_put(Z, NZD, ZPs),
                     (   { fd_get(X, XD2, XPs2) } ->
                         { domain_expand_more(NZD, Y, Expanded),
-                          domains_intersection(XD2, Expanded, NXD2) },
+                          domain_inter(XD2, Expanded, NXD2) },
                         fd_put(X, NXD2, XPs2)
                     ;   true
                     )
@@ -547,7 +559,7 @@ run_propagator(ptzdiv(X,Y,Z), MState) -->
         ;   nonvar(Z) ->
             { fd_get(X, XD, XL, XU, XPs),
               fd_get(Y, _, YL, YU, _),
-              (   YL cis_geq n(0), XL cis_geq n(0) ->
+              (   YL cis_ge n(0), XL cis_ge n(0) ->
                   NXL cis max(YL*n(Z), XL),
                   NXU cis min(YU*(n(Z)+n(1))-n(1), XU)
               ;   %TODO: cover more cases
@@ -560,9 +572,10 @@ run_propagator(ptzdiv(X,Y,Z), MState) -->
                   fd_get(Z, ZD, ZPs),
                   NZU cis max(abs(XL), XU),
                   NZL cis -NZU,
-                  domains_intersection(ZD, from_to(NZL,NZU), NZD0),
-                  (   XL cis_geq n(0), YL cis_geq n(0) ->
-                      domain_remove_smaller_than(NZD0, 0, NZD1)
+                  domain_from_bounds(NZL, NZU, _D4),
+                  domain_inter(ZD, _D4, NZD0),
+                  (   XL cis_ge n(0), YL cis_ge n(0) ->
+                      domain_remove_less_than(0, NZD0, NZD1)
                   ;   % TODO: cover more cases
                       NZD1 = NZD0
                   ) },
@@ -574,10 +587,10 @@ run_propagator(ptzdiv(X,Y,Z), MState) -->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% % Z = X mod Y
 
-run_propagator(pmod(X,Y,Z), MState) -->
+propagate(imod(X,Y,Z), MState) -->
         (   Y == 0 -> false
         ;   Y == Z -> false
-        ;   X == Y -> kill(MState), queue_goal(Z = 0)
+        ;   X == Y -> kill(MState), queue_pgoal(Z = 0)
         ;   true
         ),
         (   nonvar(X), nonvar(Y) ->
@@ -593,17 +606,17 @@ run_propagator(pmod(X,Y,Z), MState) -->
                 ;   XMin is XL
                 ),
                 { fd_get(X, XD0, XPs),
-                  domain_remove_smaller_than(XD0, XMin, XD2) },
+                  domain_remove_less_than(XMin, XD0, XD2) },
                 fd_put(X, XD2, XPs)
-                % queue_goal(X #>= XMin)
+                % queue_pgoal(X #>= XMin)
             ;   true
             ),
             (   { fd_get(X, _, _, n(XU), _) } ->
                 XMax is Z + Y * ((XU - Z) div Y),
                 { fd_get(X, XD1, XPs),
-                  domain_remove_greater_than(XD1, XMax, XD3) },
+                  domain_remove_greater_than(XMax, XD1, XD3) },
                 fd_put(X, XD3, XPs)
-                % queue_goal(X #=< XMax)
+                % queue_pgoal(X #=< XMax)
             ;   true
             )
         ;   nonvar(Z), nonvar(X) ->
@@ -624,177 +637,177 @@ run_propagator(pmod(X,Y,Z), MState) -->
             ;   (   Z > 0 ->
                     { fd_get(Y, YD, YPs),
                       YMin is Z + 1,
-                      domain_remove_smaller_than(YD, YMin, YD1) },
+                      domain_remove_less_than(YMin, YD, YD1) },
                     fd_put(Y, YD1, YPs)
-                    % queue_goal(Y #> Z)
+                    % queue_pgoal(Y #> Z)
                 ;   Z < 0 ->
                     { fd_get(Y, YD, YPs),
                       YMax is Z - 1,
-                      domain_remove_greater_than(YD, YMax, YD1) },
+                      domain_remove_greater_than(YMax, YD, YD1) },
                     fd_put(Y, YD1, YPs)
-                    % queue_goal(Y #< Z)
+                    % queue_pgoal(Y #< Z)
                 ;   true
                 )
             )
-        ;   run_propagator(pmodz(X,Y,Z), MState),
-            run_propagator(pmody(X,Y,Z), MState),
+        ;   propagate(imodz(X,Y,Z), MState),
+            propagate(imody(X,Y,Z), MState),
             true
         ).
 
-run_propagator(pmodz(X,Y,Z), MState) -->
+propagate(imodz(X,Y,Z), MState) -->
         (   nonvar(Z) -> true % Nothing to do.
         ;   nonvar(X) ->
-            (   X =:= 0 -> kill(MState), queue_goal(Z = X)
+            (   X =:= 0 -> kill(MState), queue_pgoal(Z = X)
             ;   (   X > 0 ->
                     (   { fd_get(Y, _, n(YL), _, _), YL > X } ->
                         kill(MState),
-                        queue_goal(Z = X)
+                        queue_pgoal(Z = X)
                     ;   { fd_get(Z, ZD0, ZPs),
-                          domain_remove_greater_than(ZD0, X, ZD2) },
+                          domain_remove_greater_than(X, ZD0, ZD2) },
                         fd_put(Z, ZD2, ZPs)
-                        % queue_goal(Z #=< X)
+                        % queue_pgoal(Z #=< X)
                     )
                 ;   X < 0,
                     (   { fd_get(Y, _, _, n(YU), _), YU < X } ->
                         kill(MState),
-                        queue_goal(Z = X)
+                        queue_pgoal(Z = X)
                     ;   { fd_get(Z, ZD0, ZPs),
-                          domain_remove_smaller_than(ZD0, X, ZD2) },
+                          domain_remove_less_than(X, ZD0, ZD2) },
                         fd_put(Z, ZD2, ZPs)
-                        % queue_goal(Z #>= X)
+                        % queue_pgoal(Z #>= X)
                     )
                 ),
                 (   { fd_get(Y, _, n(YL), n(YU), _), YL > 0 } ->
                     ZMax is YU - 1,
                     { fd_get(Z, ZD1, ZPs),
-                      domain_remove_smaller_than(ZD1, 0, ZD3),
-                      domain_remove_greater_than(ZD3, ZMax, ZD5) },
+                      domain_remove_less_than(0, ZD1, ZD3),
+                      domain_remove_greater_than(ZMax, ZD3, ZD5) },
                     fd_put(Z, ZD5, ZPs)
-                    % queue_goal(Z in 0..ZMax)
+                    % queue_pgoal(Z in 0..ZMax)
                 ;   { fd_get(Y, _, n(YL), n(YU), _), YU < 0 } ->
                     ZMin is YL + 1,
                     { fd_get(Z, ZD1, ZPs),
-                      domain_remove_greater_than(ZD1, 0, ZD3),
-                      domain_remove_smaller_than(ZD3, ZMin, ZD5) },
+                      domain_remove_greater_than(0, ZD1, ZD3),
+                      domain_remove_less_than(ZMin, ZD3, ZD5) },
                     fd_put(Z, ZD5, ZPs)
-                    % queue_goal(Z in ZMin..0)
+                    % queue_pgoal(Z in ZMin..0)
                 ;   true
                 )
             )
         ;   nonvar(Y) ->
-            (   abs(Y) =:= 1 -> kill(MState), queue_goal(Z = 0)
+            (   abs(Y) =:= 1 -> kill(MState), queue_pgoal(Z = 0)
             ;   Y < 0 ->
                 (   { fd_get(X, _, n(XL), n(XU), _), XU =< 0, Y < XL } ->
                     kill(MState),
-                    queue_goal(Z = X)
+                    queue_pgoal(Z = X)
                 ;   ZMin is Y + 1,
                     { fd_get(Z, ZD1, ZPs),
-                      domain_remove_greater_than(ZD1, 0, ZD3),
-                      domain_remove_smaller_than(ZD3, ZMin, ZD5) },
+                      domain_remove_greater_than(0, ZD1, ZD3),
+                      domain_remove_less_than(ZMin, ZD3, ZD5) },
                     fd_put(Z, ZD5, ZPs)
-                    % queue_goal(Z in ZMin..0)
+                    % queue_pgoal(Z in ZMin..0)
                 )
             ;   Y > 0,
                 (   { fd_get(X, _, n(XL), n(XU), _), XL >= 0, Y > XU } ->
                     kill(MState),
-                    queue_goal(Z = X)
+                    queue_pgoal(Z = X)
                 ;   ZMax is Y - 1,
                     { fd_get(Z, ZD1, ZPs),
-                      domain_remove_smaller_than(ZD1, 0, ZD3),
-                      domain_remove_greater_than(ZD3, ZMax, ZD5) },
+                      domain_remove_less_than(0, ZD1, ZD3),
+                      domain_remove_greater_than(ZMax, ZD3, ZD5) },
                     fd_put(Z, ZD5, ZPs)
-                    % queue_goal(Z in 0..ZMax)
+                    % queue_pgoal(Z in 0..ZMax)
                 )
             )
         ;   (   { fd_get(X, _, n(XL), n(XU), _), XL >= 0,
                   fd_get(Y, _, n(YL), _, _), XU < YL } ->
                 kill(MState),
-                queue_goal(Z = X)
+                queue_pgoal(Z = X)
             ;   { fd_get(X, _, n(XL), n(XU), _), XU =< 0,
                   fd_get(Y, _, _, n(YU), _), XL > YU } ->
                 kill(MState),
-                queue_goal(Z = X)
+                queue_pgoal(Z = X)
             ;   (   { fd_get(X, _, n(XL), n(XU), _), XL >= 0 } ->
                     { fd_get(Z, ZD0, ZPs),
-                      domain_remove_greater_than(ZD0, XU, ZD2) },
+                      domain_remove_greater_than(XU, ZD0, ZD2) },
                     fd_put(Z, ZD2, ZPs)
-                    % queue_goal(Z #=< XU)
+                    % queue_pgoal(Z #=< XU)
                 ;   { fd_get(X, _, n(XL), n(XU), _), XU =< 0 } ->
                     { fd_get(Z, ZD0, ZPs),
-                      domain_remove_smaller_than(ZD0, XL, ZD2) },
+                      domain_remove_less_than(XL, ZD0, ZD2) },
                     fd_put(Z, ZD2, ZPs)
-                    % queue_goal(Z #>= XL)
+                    % queue_pgoal(Z #>= XL)
                 ;   true
                 ),
                 (   { fd_get(Y, _, n(YL), n(YU), _), YL > 0 } ->
                     ZMax is YU - 1,
                     { fd_get(Z, ZD1, ZPs),
-                      domain_remove_smaller_than(ZD1, 0, ZD3),
-                      domain_remove_greater_than(ZD3, ZMax, ZD5) },
+                      domain_remove_less_than(0, ZD1, ZD3),
+                      domain_remove_greater_than(ZMax, ZD3, ZD5) },
                     fd_put(Z, ZD5, ZPs)
-                    % queue_goal(Z in 0..ZMax)
+                    % queue_pgoal(Z in 0..ZMax)
                 ;   { fd_get(Y, _, n(YL), n(YU), _), YU < 0 } ->
                     ZMin is YL + 1,
                     { fd_get(Z, ZD1, ZPs),
-                      domain_remove_greater_than(ZD1, 0, ZD3),
-                      domain_remove_smaller_than(ZD3, ZMin, ZD5) },
+                      domain_remove_greater_than(0, ZD1, ZD3),
+                      domain_remove_less_than(ZMin, ZD3, ZD5) },
                     fd_put(Z, ZD5, ZPs)
-                    % queue_goal(Z in ZMin..0)
+                    % queue_pgoal(Z in ZMin..0)
                 ;   { fd_get(Y, _, n(YL), n(YU), _), YL < 0, YU > 0 } ->
                     ZMin is YL + 1,
                     ZMax is YU - 1,
                     { fd_get(Z, ZD1, ZPs),
-                      domain_remove_greater_than(ZD1, ZMax, ZD3),
-                      domain_remove_smaller_than(ZD3, ZMin, ZD5) },
+                      domain_remove_greater_than(ZMax, ZD1, ZD3),
+                      domain_remove_less_than(ZMin, ZD3, ZD5) },
                     fd_put(Z, ZD5, ZPs)
-                    % queue_goal(Z in ZMin..ZMax)
+                    % queue_pgoal(Z in ZMin..ZMax)
                 ;   { fd_get(Y, _, _, n(YU), _), YU > 0 } ->
                     { fd_get(Z, ZD1, ZPs),
                       ZMax is YU - 1,
-                      domain_remove_greater_than(ZD1, ZMax, ZD3) },
+                      domain_remove_greater_than(ZMax, ZD1, ZD3) },
                     fd_put(Z, ZD3, ZPs)
-                    % queue_goal(Z #< YU)
+                    % queue_pgoal(Z #< YU)
                 ;   { fd_get(Y, _, n(YL), _, _), YL < 0 } ->
                     { fd_get(Z, ZD1, ZPs),
                       ZMin is YL + 1,
-                      domain_remove_smaller_than(ZD1, ZMin, ZD3) },
+                      domain_remove_less_than(ZMin, ZD1, ZD3) },
                     fd_put(Z, ZD3, ZPs)
-                    % queue_goal(Z #> YL)
+                    % queue_pgoal(Z #> YL)
                 ;   true
                 )
             )
         ).
 
-run_propagator(pmody(_X,Y,Z), _MState) -->
+propagate(imody(_X,Y,Z), _MState) -->
         (   nonvar(Y) -> true % Nothing to do.
         % ;   nonvar(X) -> true
         ;   nonvar(Z) ->
             (   Z > 0 ->
                 { fd_get(Y, YD, YPs),
                   YMin is Z + 1,
-                  domain_remove_smaller_than(YD, YMin, YD1) },
+                  domain_remove_less_than(YMin, YD, YD1) },
                 fd_put(Y, YD1, YPs)
-                % queue_goal(Y #> Z)
+                % queue_pgoal(Y #> Z)
             ;   Z < 0 ->
                 { fd_get(Y, YD, YPs),
                   YMax is Z - 1,
-                  domain_remove_greater_than(YD, YMax, YD1) },
+                  domain_remove_greater_than(YMax, YD, YD1) },
                 fd_put(Y, YD1, YPs)
-                % queue_goal(Y #< Z)
+                % queue_pgoal(Y #< Z)
             ;   Z =:= 0 % Multiple solutions so do nothing special.
             )
         ;   (   { fd_get(Z, _, n(ZL), _, _), ZL > 0 } ->
                 { fd_get(Y, YD, YPs),
                   YMin is ZL + 1,
-                  domain_remove_smaller_than(YD, YMin, YD1) },
+                  domain_remove_less_than(YMin, YD, YD1) },
                 fd_put(Y, YD1, YPs)
-                % queue_goal(Y #> ZL)
+                % queue_pgoal(Y #> ZL)
             ;   { fd_get(Z, _, _, n(ZU), _), ZU < 0 } ->
                 { fd_get(Y, YD, YPs),
                   YMax is ZU - 1,
-                  domain_remove_greater_than(YD, YMax, YD1) },
+                  domain_remove_greater_than(YMax, YD, YD1) },
                 fd_put(Y, YD1, YPs)
-                % queue_goal(Y #< ZU)
+                % queue_pgoal(Y #< ZU)
             ;   true
             )
         ).
@@ -803,7 +816,7 @@ run_propagator(pmody(_X,Y,Z), _MState) -->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% % Z = X rem Y
 
-run_propagator(prem(X,Y,Z), MState) -->
+propagate(prem(X,Y,Z), MState) -->
         (   nonvar(X) ->
             (   nonvar(Y) -> kill(MState), Y =\= 0, Z is X rem Y
             ;   U is abs(X),
@@ -832,9 +845,9 @@ run_propagator(prem(X,Y,Z), MState) -->
                 ;   ZL = YN, ZU = YP
                 ),
                 (   { fd_get(Z, ZD, ZPs) } ->
-                    { domains_intersection(ZD, from_to(n(ZL), n(ZU)), ZD1) },
+                    { domain_from_bounds(n(ZL), n(ZU), _D5), domain_inter(ZD, _D5, ZD1) },
                     fd_put(Z, ZD1, ZPs)
-                ;   ZD1 = from_to(n(Z), n(Z))
+                ;   { domain_singleton(ZD1, n(Z)) }
                 ),
                 (   { fd_get(X, XD, _), domain_infimum(XD, n(Min)) } ->
                     Z1 is Min rem Y,
@@ -856,7 +869,7 @@ run_propagator(prem(X,Y,Z), MState) -->
                     (   Min rem Y =:= Z -> true
                     ;   Y > 0, Min > 0 ->
                         Next is ((Min - Z + Y - 1) div Y)*Y + Z,
-                        { domain_remove_smaller_than(XD1, Next, XD2) },
+                        { domain_remove_less_than(Next, XD1, XD2) },
                         fd_put(X, XD2, XPs1)
                     ;   % TODO: bigger steps in other cases as well
                         neq_num(X, Min)
@@ -868,7 +881,7 @@ run_propagator(prem(X,Y,Z), MState) -->
                         (   Max rem Y =:= Z -> true
                         ;   Y > 0, Max > 0  ->
                             Prev is ((Max - Z) div Y)*Y + Z,
-                            { domain_remove_greater_than(XD3, Prev, XD4) },
+                            { domain_remove_greater_than(Prev, XD3, XD4) },
                             fd_put(X, XD4, XPs3)
                         ;   % TODO: bigger steps in other cases as well
                             neq_num(X, Max)
@@ -883,15 +896,16 @@ run_propagator(prem(X,Y,Z), MState) -->
             { fd_get(Y, _, YInf, YSup, _),
               fd_get(X, _, XInf, XSup, _),
               M cis max(abs(YInf),YSup),
-              (   XInf cis_geq n(0) -> Inf0 = n(0)
+              (   XInf cis_ge n(0) -> Inf0 = n(0)
               ;   Inf0 = XInf
               ),
-              (   XSup cis_leq n(0) -> Sup0 = n(0)
+              (   XSup cis_le n(0) -> Sup0 = n(0)
               ;   Sup0 = XSup
               ),
               NInf cis max(max(Inf0, -M + n(1)), min(XInf,-XSup)),
               NSup cis min(min(Sup0, M - n(1)), max(abs(XInf),XSup)),
-              domains_intersection(ZD, from_to(NInf,NSup), ZD1) },
+              domain_from_bounds(NInf, NSup, _D6),
+              domain_inter(ZD, _D6, ZD1) },
             fd_put(Z, ZD1, ZPs)
         ;   true % TODO: propagate more
         ).
@@ -899,33 +913,33 @@ run_propagator(prem(X,Y,Z), MState) -->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Z = max(X,Y)
 
-run_propagator(pmax(X,Y,Z), MState) -->
+propagate(imax(X,Y,Z), MState) -->
         (   nonvar(X) ->
-            (   nonvar(Y) -> kill(MState), queue_goal(Z is max(X,Y))
+            (   nonvar(Y) -> kill(MState), queue_pgoal(Z is max(X,Y))
             ;   nonvar(Z) ->
-                (   Z =:= X -> kill(MState), queue_goal(X #>= Y)
-                ;   Z > X -> queue_goal(Z = Y)
+                (   Z =:= X -> kill(MState), queue_pgoal(X #>= Y)
+                ;   Z > X -> queue_pgoal(Z = Y)
                 ;   false % Z < X
                 )
-            ;   Y == Z -> kill(MState), queue_goal(Y #>= X)
+            ;   Y == Z -> kill(MState), queue_pgoal(Y #>= X)
             ;   { fd_get(Y, _, YInf, YSup, _) },
-                (   { YInf cis_gt n(X) } -> queue_goal(Z = Y)
-                ;   { YSup cis_lt n(X) } -> queue_goal(Z = X)
+                (   { YInf cis_gt n(X) } -> queue_pgoal(Z = Y)
+                ;   { YSup cis_lt n(X) } -> queue_pgoal(Z = X)
                 ;   YSup = n(M) ->
                     { fd_get(Z, ZD, ZPs),
-                      domain_remove_greater_than(ZD, M, ZD1) },
+                      domain_remove_greater_than(M, ZD, ZD1) },
                     fd_put(Z, ZD1, ZPs)
                 ;   []
                 )
             )
-        ;   nonvar(Y) -> run_propagator(pmax(Y,X,Z), MState)
+        ;   nonvar(Y) -> propagate(imax(Y,X,Z), MState)
         ;   { fd_get(Z, ZD, ZPs) } ->
             { fd_get(X, _, XInf, XSup, _),
               fd_get(Y, _, YInf, YSup, _) },
-            (   { YInf cis_gt XSup } -> kill(MState), queue_goal(Z = Y)
-            ;   { YSup cis_lt XInf } -> kill(MState), queue_goal(Z = X)
+            (   { YInf cis_gt XSup } -> kill(MState), queue_pgoal(Z = Y)
+            ;   { YSup cis_lt XInf } -> kill(MState), queue_pgoal(Z = X)
             ;   { n(M) cis max(XSup, YSup) } ->
-                { domain_remove_greater_than(ZD, M, ZD1) },
+                { domain_remove_greater_than(M, ZD, ZD1) },
                 fd_put(Z, ZD1, ZPs)
             ;   []
             )
@@ -935,7 +949,7 @@ run_propagator(pmax(X,Y,Z), MState) -->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Z = min(X,Y)
 
-run_propagator(pmin(X,Y,Z), MState) -->
+propagate(imin(X,Y,Z), MState) -->
         (   nonvar(X) ->
             (   nonvar(Y) -> kill(MState), Z is min(X,Y)
             ;   nonvar(Z) ->
@@ -943,25 +957,25 @@ run_propagator(pmin(X,Y,Z), MState) -->
                 ;   Z < X -> Z = Y
                 ;   false % Z > X
                 )
-            ;   Y == Z -> kill(MState), queue_goal(Y #=< X)
+            ;   Y == Z -> kill(MState), queue_pgoal(Y #=< X)
             ;   { fd_get(Y, _, YInf, YSup, _) },
                 (   { YSup cis_lt n(X) } -> Z = Y
                 ;   { YInf cis_gt n(X) } -> Z = X
                 ;   YInf = n(M) ->
                     { fd_get(Z, ZD, ZPs),
-                      domain_remove_smaller_than(ZD, M, ZD1) },
+                      domain_remove_less_than(M, ZD, ZD1) },
                     fd_put(Z, ZD1, ZPs)
                 ;   []
                 )
             )
-        ;   nonvar(Y) -> run_propagator(pmin(Y,X,Z), MState)
+        ;   nonvar(Y) -> propagate(imin(Y,X,Z), MState)
         ;   { fd_get(Z, ZD, ZPs) } ->
             { fd_get(X, _, XInf, XSup, _),
               fd_get(Y, _, YInf, YSup, _) },
             (   { YSup cis_lt XInf } -> kill(MState), Z = Y
             ;   { YInf cis_gt XSup } -> kill(MState), Z = X
             ;   { n(M) cis min(XInf, YInf) } ->
-                { domain_remove_smaller_than(ZD, M, ZD1) },
+                { domain_remove_less_than(M, ZD, ZD1) },
                 fd_put(Z, ZD1, ZPs)
             ;   []
             )
@@ -971,12 +985,12 @@ run_propagator(pmin(X,Y,Z), MState) -->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% % Z = X ^ Y
 
-run_propagator(pexp(X,Y,Z), MState) -->
+propagate(iexp(X,Y,Z), MState) -->
         (   X == 1 -> kill(MState), Z = 1
-        ;   X == 0 -> kill(MState), queue_goal((Z in 0..1, Y #>= 0, Z #<==> Y #= 0))
+        ;   X == 0 -> kill(MState), queue_pgoal((Z in 0..1, Y #>= 0, Z #<==> Y #= 0))
         ;   Y == 0 -> kill(MState), Z = 1
         ;   Y == 1 -> kill(MState), Z = X
-        ;   Y == Z -> kill(MState), X = Y, queue_goal(X in -1\/1)
+        ;   Y == Z -> kill(MState), X = Y, queue_pgoal(X in -1\/1)
         ;   nonvar(X) ->
             (   nonvar(Y) ->
                 (   Y >= 0 -> true ; X =:= -1 ),
@@ -991,10 +1005,11 @@ run_propagator(pexp(X,Y,Z), MState) -->
                 )
             ;   { fd_get(Y, _, YL, YU, _),
                   fd_get(Z, ZD, ZPs) },
-                (   { X > 0, YL cis_geq n(0) } ->
+                (   { X > 0, YL cis_ge n(0) } ->
                     { NZL cis n(X)^YL,
                       NZU cis n(X)^YU,
-                      domains_intersection(ZD, from_to(NZL,NZU), NZD) },
+                      domain_from_bounds(NZL, NZU, _D7),
+                      domain_inter(ZD, _D7, NZD) },
                     fd_put(Z, NZD, ZPs)
                 ;   true
                 ),
@@ -1002,7 +1017,7 @@ run_propagator(pexp(X,Y,Z), MState) -->
                       fd_get(Z, _, _, n(ZMax), _),
                       ZMax > 0 } ->
                     { floor_integer_log_b(ZMax, X, 1, YCeil) },
-                    queue_goal(Y in inf..YCeil)
+                    queue_pgoal(Y in inf..YCeil)
                 ;   true
                 )
             )
@@ -1019,12 +1034,14 @@ run_propagator(pexp(X,Y,Z), MState) -->
                 (   { Z > 1, between(NXL, Z, Exp), NXL^Exp > Z } ->
                     Exp1 is Exp - 1,
                     { fd_get(Y, YD, YPs),
-                      domains_intersection(YD, from_to(n(1),n(Exp1)), YD1) },
+                      domain_from_bounds(n(1), n(Exp1), _D7),
+                      domain_inter(YD, _D7, YD1) },
                     fd_put(Y, YD1, YPs),
                     (   { fd_get(X, XD, XPs) } ->
                         { domain_infimum(YD1, n(YL)),
                           integer_kth_root_leq(Z, YL, RU),
-                          domains_intersection(XD, from_to(n(NXL),n(RU)), XD1) },
+                          domain_from_bounds(n(NXL), n(RU), _D8),
+                          domain_inter(XD, _D8, XD1) },
                         fd_put(X, XD1, XPs)
                     ;   true
                     )
@@ -1035,37 +1052,38 @@ run_propagator(pexp(X,Y,Z), MState) -->
         ;   nonvar(Y), Y > 0 ->
             (   { even(Y) } ->
                 { fd_get(Z, ZD0, ZPs0),
-                  domain_remove_smaller_than(ZD0, 0, ZDG0) },
+                  domain_remove_less_than(0, ZD0, ZDG0) },
                 fd_put(Z, ZDG0, ZPs0)
             ;   true
             ),
             (   { fd_get(X, XD, XL, XU, _), fd_get(Z, ZD, ZL, ZU, ZPs) } ->
                 (   { domain_contains(ZD, 0) } -> XD1 = XD
-                ;   { domain_remove(XD, 0, XD1) }
+                ;   { domain_remove(0, XD, XD1) }
                 ),
                 (   { domain_contains(XD, 0) } -> ZD1 = ZD
-                ;   { domain_remove(ZD, 0, ZD1) }
+                ;   { domain_remove(0, ZD, ZD1) }
                 ),
                 (   { even(Y) } ->
-                    (   { XL cis_geq n(0) } ->
+                    (   { XL cis_ge n(0) } ->
                         { NZL cis XL^n(Y) }
-                    ;   { XU cis_leq n(0) } ->
+                    ;   { XU cis_le n(0) } ->
                         { NZL cis XU^n(Y) }
                     ;   NZL = n(0)
                     ),
                     { NZU cis max(abs(XL),abs(XU))^n(Y),
-                      domains_intersection(ZD1, from_to(NZL,NZU), ZD2) }
+                      domain_from_bounds(NZL, NZU, _D9),
+                      domain_inter(ZD1, _D9, ZD2) }
                 ;   (   { finite(XL) } ->
                         { NZL cis XL^n(Y),
                           NZU cis XU^n(Y) },
-                        { domains_intersection(ZD1, from_to(NZL,NZU), ZD2) }
+                        { domain_from_bounds(NZL, NZU, _D10), domain_inter(ZD1, _D10, ZD2) }
                     ;   ZD2 = ZD1
                     )
                 ),
                 fd_put(Z, ZD2, ZPs),
                 { (   even(Y), ZU = n(Num) ->
                     integer_kth_root_leq(Num, Y, RU),
-                    (   XL cis_geq n(0), ZL = n(Num1), Num1 >= 0 ->
+                    (   XL cis_ge n(0), ZL = n(Num1), Num1 >= 0 ->
                         integer_kth_root_leq(Num1, Y, RL0),
                         (   RL0^Y < Num1 -> RL is RL0 + 1
                         ;   RL = RL0
@@ -1073,8 +1091,8 @@ run_propagator(pexp(X,Y,Z), MState) -->
                     ;   RL is -RU
                     ),
                     RL =< RU,
-                    NXD = from_to(n(RL),n(RU))
-                ;   odd(Y), ZL cis_geq n(0), ZU = n(Num) ->
+                    domain_from_bounds(n(RL), n(RU), NXD)
+                ;   odd(Y), ZL cis_ge n(0), ZU = n(Num) ->
                     integer_kth_root_leq(Num, Y, RU),
                     ZL = n(Num1),
                     integer_kth_root_leq(Num1, Y, RL0),
@@ -1082,12 +1100,12 @@ run_propagator(pexp(X,Y,Z), MState) -->
                     ;   RL = RL0
                     ),
                     RL =< RU,
-                    NXD = from_to(n(RL),n(RU))
+                    domain_from_bounds(n(RL), n(RU), NXD)
                 ;   NXD = XD1   % TODO: propagate more
                 ) },
                 (   { fd_get(X, XD2, XPs) } ->
-                    { domains_intersection(XD2, XD1, XD3),
-                      domains_intersection(XD3, NXD, XD4) },
+                    { domain_inter(XD2, XD1, XD3),
+                      domain_inter(XD3, NXD, XD4) },
                     fd_put(X, XD4, XPs)
                 ;   true
                 )
@@ -1099,7 +1117,7 @@ run_propagator(pexp(X,Y,Z), MState) -->
               YL cis_gt n(0),
               fd_get(Z, ZD, ZPs) } ->
             { n(NZL) cis XL^YL,
-              domain_remove_smaller_than(ZD, NZL, ZD1) },
+              domain_remove_less_than(NZL, ZD, ZD1) },
             fd_put(Z, ZD1, ZPs)
         ;   true
         ).
@@ -1107,14 +1125,14 @@ run_propagator(pexp(X,Y,Z), MState) -->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% % Y = sign(X)
 
-run_propagator(psign(X,Y), MState) -->
-        (   nonvar(X) -> kill(MState), queue_goal(Y is sign(X))
-        ;   Y == -1 -> kill(MState), queue_goal(X #< 0)
-        ;   Y == 0 -> kill(MState), queue_goal(X = 0)
-        ;   Y == 1 -> kill(MState), queue_goal(X #> 0)
+propagate(isgn(X,Y), MState) -->
+        (   nonvar(X) -> kill(MState), queue_pgoal(Y is sign(X))
+        ;   Y == -1 -> kill(MState), queue_pgoal(X #< 0)
+        ;   Y == 0 -> kill(MState), queue_pgoal(X = 0)
+        ;   Y == 1 -> kill(MState), queue_pgoal(X #> 0)
         ;   { fd_get(X, _, XL, XU, _) },
-            (   { XL = n(L), L > 0 } -> kill(MState), queue_goal(Y = 1)
-            ;   { XU = n(U), U < 0 } -> kill(MState), queue_goal(Y = -1)
+            (   { XL = n(L), L > 0 } -> kill(MState), queue_pgoal(Y = 1)
+            ;   { XU = n(U), U < 0 } -> kill(MState), queue_pgoal(Y = -1)
             ;   true
             )
         ).
@@ -1122,7 +1140,7 @@ run_propagator(psign(X,Y), MState) -->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% % Z = X xor Y
 
-run_propagator(pxor(X,Y,Z), MState) -->
+propagate(ixor(X,Y,Z), MState) -->
         (   nonvar(X), nonvar(Y) ->
             kill(MState),
             Z is xor(X, Y)
@@ -1134,27 +1152,27 @@ run_propagator(pxor(X,Y,Z), MState) -->
             Y is xor(Z, X)
         ;   X == Y ->
             kill(MState),
-            queue_goal(Z = 0)
+            queue_pgoal(Z = 0)
         ;   Y == Z ->
             kill(MState),
-            queue_goal(X = 0)
+            queue_pgoal(X = 0)
         ;   Z == X ->
             kill(MState),
-            queue_goal(Y = 0)
+            queue_pgoal(Y = 0)
         ;   X == 0 ->
             kill(MState),
-            queue_goal(Y = Z)
+            queue_pgoal(Y = Z)
         ;   Y == 0 ->
             kill(MState),
-            queue_goal(Z = X)
+            queue_pgoal(Z = X)
         ;   Z == 0 ->
             kill(MState),
-            queue_goal(X = Y)
+            queue_pgoal(X = Y)
         ;   true
         ).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-run_propagator(pzcompare(Order, A, B), MState) -->
+propagate(pzcompare(Order, A, B), MState) -->
         (   A == B -> kill(MState), Order = (=)
         ;   (   nonvar(A) ->
                 (   nonvar(B) ->
@@ -1189,7 +1207,7 @@ run_propagator(pzcompare(Order, A, B), MState) -->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-run_propagator(reified_in(V,Dom,B), MState) -->
+propagate(reified_in(V,Dom,B), MState) -->
         (   integer(V) ->
             kill(MState),
             (   { domain_contains(Dom, V) } -> B = 1
@@ -1199,7 +1217,7 @@ run_propagator(reified_in(V,Dom,B), MState) -->
         ;   B == 0 ->
             kill(MState), { domain_complement(Dom, C), domain(V, C) }
         ;   { fd_get(V, VD, _) },
-            (   { domains_intersection(VD, Dom, I) } ->
+            (   { domain_inter(VD, Dom, I) } ->
                 (   I == VD -> kill(MState), B = 1
                 ;   []
                 )
@@ -1207,12 +1225,12 @@ run_propagator(reified_in(V,Dom,B), MState) -->
             )
         ).
 
-run_propagator(reified_tuple_in(Tuple, R, B), MState) -->
+propagate(reified_tuple_in(Tuple, R, B), MState) -->
         { get_attr(R, clpz_relation, Relation) },
         (   B == 1 -> kill(MState), { tuples_in([Tuple], Relation) }
         ;   (   ground(Tuple) ->
                 kill(MState),
-                (   { memberchk(Tuple, Relation) } -> B = 1
+                (   { member(Tuple, Relation) } -> B = 1
                 ;   B = 0
                 )
             ;   { relation_unifiable(Relation, Tuple, Us, _, _) },
@@ -1222,7 +1240,7 @@ run_propagator(reified_tuple_in(Tuple, R, B), MState) -->
             )
         ).
 
-run_propagator(tuples_not_in(Tuples, Relation, B), MState) -->
+propagate(tuples_not_in(Tuples, Relation, B), MState) -->
         (   B == 0 ->
             kill(MState),
             { tuples_in_conjunction(Tuples, Relation, Conj),
@@ -1230,15 +1248,15 @@ run_propagator(tuples_not_in(Tuples, Relation, B), MState) -->
         ;   []
         ).
 
-run_propagator(kill_reified_tuples(B, Ps, Bs), _) -->
+propagate(kill_reified_tuples(B, Ps, Bs), _) -->
         (   B == 0 ->
-            { maplist(kill_entailed, Ps),
-              phrase(as(Bs), As),
-              maplist(kill_entailed, As) }
+            { list_map(kill_entailed, Ps),
+              phrase(map(a, Bs), As),
+              list_map(kill_entailed, As) }
         ;   []
         ).
 
-run_propagator(reified_fd(V,B), MState) -->
+propagate(reified_fd(V,B), MState) -->
         (   { fd_inf(V, I), I \== inf, fd_sup(V, S), S \== sup } ->
             kill(MState),
             B = 1
@@ -1251,7 +1269,7 @@ run_propagator(reified_fd(V,B), MState) -->
 
 % The result of X/Y, X mod Y, and X rem Y is undefined iff Y is 0.
 
-run_propagator(pskeleton(X,Y,D,Skel,Z,_), MState) -->
+propagate(pskeleton(X,Y,D,Skel,Z,_), MState) -->
         (   Y == 0 -> kill(MState), D = 0
         ;   D == 1 ->
             kill(MState), neq_num(Y, 0), { skeleton([X,Y,Z], Skel) }
@@ -1267,14 +1285,14 @@ run_propagator(pskeleton(X,Y,D,Skel,Z,_), MState) -->
    functionally. These are currently the bitwise operations.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-run_propagator(pfunction(Op,A,B,R), MState) -->
+propagate(pfunction(Op,A,B,R), MState) -->
         (   integer(A), integer(B) ->
             kill(MState),
             Expr =.. [Op,A,B],
             R is Expr
         ;   []
         ).
-run_propagator(pfunction(Op,A,R), MState) -->
+propagate(pfunction(Op,A,R), MState) -->
         (   integer(A) ->
             kill(MState),
             Expr =.. [Op,A],
@@ -1284,7 +1302,7 @@ run_propagator(pfunction(Op,A,R), MState) -->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-run_propagator(reified_geq(DX,X,DY,Y,Ps,B), MState) -->
+propagate(reified_geq(DX,X,DY,Y,Ps,B), MState) -->
         (   DX == 0 -> kill(MState, Ps), B = 0
         ;   DY == 0 -> kill(MState, Ps), B = 0
         ;   B == 1 ->  kill(MState), DX = 1, DY = 1, { geq(X, Y) }
@@ -1295,21 +1313,21 @@ run_propagator(reified_geq(DX,X,DY,Y,Ps,B), MState) -->
                         kill(MState),
                         (   X >= Y -> B = 1 ; B = 0 )
                     ;   { fd_get(Y, _, YL, YU, _) },
-                        (   { n(X) cis_geq YU } -> kill(MState, Ps), B = 1
+                        (   { n(X) cis_ge YU } -> kill(MState, Ps), B = 1
                         ;   { n(X) cis_lt YL } -> kill(MState, Ps), B = 0
                         ;   []
                         )
                     )
                 ;   nonvar(Y) ->
                     { fd_get(X, _, XL, XU, _) },
-                    (   { XL cis_geq n(Y) } -> kill(MState, Ps), B = 1
+                    (   { XL cis_ge n(Y) } -> kill(MState, Ps), B = 1
                     ;   { XU cis_lt n(Y) } -> kill(MState, Ps), B = 0
                     ;   []
                     )
                 ;   X == Y -> kill(MState, Ps), B = 1
                 ;   { fd_get(X, _, XL, XU, _),
                       fd_get(Y, _, YL, YU, _) },
-                    (   { XL cis_geq YU } -> kill(MState, Ps), B = 1
+                    (   { XL cis_ge YU } -> kill(MState, Ps), B = 1
                     ;   { XU cis_lt YL } -> kill(MState, Ps), B = 0
                     ;   []
                     )
@@ -1321,7 +1339,7 @@ run_propagator(reified_geq(DX,X,DY,Y,Ps,B), MState) -->
         ).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-run_propagator(reified_eq(DX,X,DY,Y,Ps,B), MState) -->
+propagate(reified_eq(DX,X,DY,Y,Ps,B), MState) -->
         (   DX == 0 -> kill(MState, Ps), B = 0
         ;   DY == 0 -> kill(MState, Ps), B = 0
         ;   B == 1 -> kill(MState), DX = 1, DY = 1, X = Y
@@ -1337,7 +1355,7 @@ run_propagator(reified_eq(DX,X,DY,Y,Ps,B), MState) -->
                         )
                     )
                 ;   nonvar(Y) ->
-                    run_propagator(reified_eq(DY,Y,DX,X,Ps,B), MState)
+                    propagate(reified_eq(DY,Y,DX,X,Ps,B), MState)
                 ;   X == Y -> kill(MState), B = 1
                 ;   { fd_get(X, _, XL, XU, _),
                       fd_get(Y, _, YL, YU, _) },
@@ -1352,7 +1370,7 @@ run_propagator(reified_eq(DX,X,DY,Y,Ps,B), MState) -->
         ;   []
         ).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-run_propagator(reified_neq(DX,X,DY,Y,Ps,B), MState) -->
+propagate(reified_neq(DX,X,DY,Y,Ps,B), MState) -->
         (   DX == 0 -> kill(MState, Ps), B = 0
         ;   DY == 0 -> kill(MState, Ps), B = 0
         ;   B == 1 -> { kill(MState), DX = 1, DY = 1, X #\= Y }
@@ -1368,7 +1386,7 @@ run_propagator(reified_neq(DX,X,DY,Y,Ps,B), MState) -->
                         )
                     )
                 ;   nonvar(Y) ->
-                    run_propagator(reified_neq(DY,Y,DX,X,Ps,B), MState)
+                    propagate(reified_neq(DY,Y,DX,X,Ps,B), MState)
                 ;   X == Y -> kill(MState), B = 0
                 ;   { fd_get(X, _, XL, XU, _),
                       fd_get(Y, _, YL, YU, _) },
@@ -1383,31 +1401,31 @@ run_propagator(reified_neq(DX,X,DY,Y,Ps,B), MState) -->
         ;   []
         ).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-run_propagator(reified_and(X,Ps1,Y,Ps2,B), MState) -->
+propagate(reified_and(X,Ps1,Y,Ps2,B), MState) -->
         (   nonvar(X) ->
             kill(MState),
-            (   X =:= 0 -> { maplist(kill_entailed, Ps2), B = 0 }
+            (   X =:= 0 -> { list_map(kill_entailed, Ps2), B = 0 }
             ;   B = Y
             )
-        ;   nonvar(Y) -> run_propagator(reified_and(Y,Ps2,X,Ps1,B), MState)
+        ;   nonvar(Y) -> propagate(reified_and(Y,Ps2,X,Ps1,B), MState)
         ;   B == 1 -> kill(MState), X = 1, Y = 1
         ;   []
         ).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-run_propagator(reified_or(X,Ps1,Y,Ps2,B), MState) -->
+propagate(reified_or(X,Ps1,Y,Ps2,B), MState) -->
         (   nonvar(X) ->
             kill(MState),
-            (   X =:= 1 -> { maplist(kill_entailed, Ps2), B = 1 }
+            (   X =:= 1 -> { list_map(kill_entailed, Ps2), B = 1 }
             ;   B = Y
             )
-        ;   nonvar(Y) -> run_propagator(reified_or(Y,Ps2,X,Ps1,B), MState)
+        ;   nonvar(Y) -> propagate(reified_or(Y,Ps2,X,Ps1,B), MState)
         ;   B == 0 -> kill(MState), X = 0, Y = 0
         ;   []
         ).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-run_propagator(reified_not(X,Y), MState) -->
+propagate(reified_not(X,Y), MState) -->
         (   X == 0 -> kill(MState), Y = 1
         ;   X == 1 -> kill(MState), Y = 0
         ;   Y == 0 -> kill(MState), X = 1
@@ -1416,23 +1434,23 @@ run_propagator(reified_not(X,Y), MState) -->
         ).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-run_propagator(pimpl(X, Y, Ps), MState) -->
+propagate(pimpl(X, Y, Ps), MState) -->
         (   nonvar(X) ->
             kill(MState),
             (   X =:= 1 -> Y = 1
-            ;   { maplist(kill_entailed, Ps) }
+            ;   { list_map(kill_entailed, Ps) }
             )
         ;   nonvar(Y) ->
             kill(MState),
             (   Y =:= 0 -> X = 0
-            ;   { maplist(kill_entailed, Ps) }
+            ;   { list_map(kill_entailed, Ps) }
             )
         ;   []
         ).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-run_propagator(preified_slash(X, Y, D, R), MState) -->
+propagate(preified_slash(X, Y, D, R), MState) -->
         (   Y == 0 ->
             kill(MState),
             D = 0
@@ -1450,13 +1468,13 @@ run_propagator(preified_slash(X, Y, D, R), MState) -->
             )
         ;   D == 1 ->
             kill(MState),
-            queue_goal(X/Y #= R)
+            queue_pgoal(X/Y #= R)
         ;   []
         ).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-run_propagator(preified_exp(X, Y, D, R), MState) -->
+propagate(preified_exp(X, Y, D, R), MState) -->
         (   X == 1 ->
             kill(MState),
             D = 1,
@@ -1479,6 +1497,6 @@ run_propagator(preified_exp(X, Y, D, R), MState) -->
             )
         ;   D == 1 ->
             kill(MState),
-            queue_goal(X^Y #= R)
+            queue_pgoal(X^Y #= R)
         ;   []
         ).

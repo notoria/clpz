@@ -25,7 +25,7 @@ reifiable_(Expr)   :-
 reifiable_(#\ E) :- reifiable(E).
 reifiable_(tuples_in(Tuples, Relation)) :-
         must_be(list(list), Tuples),
-        maplist(maplist(fd_variable), Tuples),
+        list_map(list_map(fd_variable), Tuples),
         must_be(list(list(integer)), Relation).
 reifiable_(finite_domain(V)) :- fd_variable(V).
 
@@ -41,21 +41,29 @@ reify_(E, B) --> { integer(E), E = B }.
 reify_(?(B), B) --> [].
 reify_(#B, B) --> [].
 reify_(V in Drep, B) -->
-        { drep_to_domain(Drep, Dom) },
-        propagator_init_trigger(reified_in(V,Dom,B)),
-        a(B).
+    { drep_to_domain(Drep, Dom) },
+    [p(P)],
+    { propagator_from_constraint(reified_in(V,Dom,B), P),
+      term_variables([V,B], Vs),
+      propagator_trigger(P, Vs) },
+    a(B).
 reify_(tuples_in(Tuples, Relation), B) -->
-        { maplist(relation_tuple_b_prop(Relation), Tuples, Bs, Ps),
-          maplist(monotonic, Bs, Bs1),
-          fold_statement(conjunction, Bs1, And),
-          #B #<==> And },
-        propagator_init_trigger([B], tuples_not_in(Tuples, Relation, B)),
-        kill_reified_tuples(Bs, Ps, Bs),
-        seq(Ps),
-        as([B|Bs]).
+    { list_map(relation_tuple_b_prop(Relation), Tuples, Bs, Ps),
+      list_map(monotonic, Bs, Bs1),
+      fold_statement(conjunction, Bs1, And),
+      #B #<==> And },
+    [p(P)],
+    { propagator_from_constraint(tuples_not_in(Tuples,Relation,B), P),
+      propagator_trigger(P, [B]) },
+    kill_reified_tuples(Bs, Ps, Bs),
+    map(identity, Ps),
+    map(a, [B|Bs]).
 reify_(finite_domain(V), B) -->
-        propagator_init_trigger(reified_fd(V,B)),
-        a(B).
+    [p(P)],
+    { propagator_from_constraint(reified_fd(V,B), P),
+      term_variables([V,B], Vs),
+      propagator_trigger(P, Vs) },
+    a(B).
 reify_(L #>= R, B) --> arithmetic(L, R, B, reified_geq).
 reify_(L #= R, B)  --> arithmetic(L, R, B, reified_eq).
 reify_(L #\= R, B) --> arithmetic(L, R, B, reified_neq).
@@ -75,24 +83,31 @@ reify_(L #\/ R, B) -->
         ;   boolean(L, R, B, reified_or)
         ).
 reify_(#\ Q, B) -->
-        reify(Q, QR),
-        propagator_init_trigger(reified_not(QR,B)),
-        a(B).
+    reify(Q, QR),
+    [p(P)],
+    { propagator_from_constraint(reified_not(QR,B), P),
+      term_variables([QR,B], Vs),
+      propagator_trigger(P, Vs) },
+    a(B).
 
 arithmetic(L, R, B, Functor) -->
-        { phrase((parse_reified_clpz(L, LR, LD),
-                  parse_reified_clpz(R, RR, RD)), Ps),
-          Prop =.. [Functor,LD,LR,RD,RR,Ps,B] },
-        seq(Ps),
-        propagator_init_trigger([LD,LR,RD,RR,B], Prop),
-        a(B).
+    { phrase((parse_reified_clpz(L, LR, LD),
+              parse_reified_clpz(R, RR, RD)), Ps),
+      C =.. [Functor,LD,LR,RD,RR,Ps,B] },
+    map(identity, Ps),
+    [p(P)],
+    { propagator_from_constraint(C, P),
+      propagator_trigger(P, [LD,LR,RD,RR,B]) },
+    a(B).
 
 boolean(L, R, B, Functor) -->
-        { reify(L, LR, Ps1), reify(R, RR, Ps2),
-          Prop =.. [Functor,LR,Ps1,RR,Ps2,B] },
-        seq(Ps1), seq(Ps2),
-        propagator_init_trigger([LR,RR,B], Prop),
-        a(LR, RR, B).
+    { reify(L, LR, Ps1), reify(R, RR, Ps2),
+      C =.. [Functor,LR,Ps1,RR,Ps2,B] },
+    map(identity, Ps1), map(identity, Ps2),
+    [p(P)],
+    { propagator_from_constraint(C, P),
+      propagator_trigger(P, [LR,RR,B]) },
+    a(LR, RR, B).
 
 a(X,Y,B) -->
         (   nonvar(X) -> a(Y, B)
@@ -115,13 +130,21 @@ as([B|Bs]) --> a(B), as(Bs).
 
 kill_reified_tuples([], _, _) --> [].
 kill_reified_tuples([B|Bs], Ps, All) -->
-        propagator_init_trigger([B], kill_reified_tuples(B, Ps, All)),
-        kill_reified_tuples(Bs, Ps, All).
+    [p(P)],
+    { propagator_from_constraint(kill_reified_tuples(B,Ps,All), P),
+      propagator_trigger(P, [B]) },
+    kill_reified_tuples(Bs, Ps, All).
 
 relation_tuple_b_prop(Relation, Tuple, B, p(Prop)) :-
         put_attr(R, clpz_relation, Relation),
-        make_propagator(reified_tuple_in(Tuple, R, B), Prop),
-        new_queue(Q0),
-        phrase((tuple_freeze_(Tuple, Prop),
-                init_propagator_([B], Prop),
-                do_queue), [Q0], _).
+        propagator_from_constraint(reified_tuple_in(Tuple,R,B), Prop),
+        queue_empty(Q0),
+        phrase(
+            (   map('@tuple_freeze'(Prop), Tuple),
+                propagator_variable(Prop, B),
+                % QUESTION: Why no `propagator_queue//1`?
+                propagator_catalyze
+            ),
+            [Q0],
+            _
+        ).

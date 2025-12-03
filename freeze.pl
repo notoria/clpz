@@ -33,7 +33,8 @@ freeze(X, G) :-
     ->  put_attribute(+, Y, frozen(G)),
         put_verifier(+, Y, freezer),
         put_reifier(+, Y, frozen),
-        Y = X
+        Y = X % Best/"Right" orientation
+        % X = Y
     ;   call(G)
     ).
 

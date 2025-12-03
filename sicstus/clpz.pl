@@ -40,33 +40,25 @@
 */
 
 
-:- include("core").
-:- include("assoc").
-:- include("pairs").
-:- include("lists").
-:- include("atts").
-:- include("dcg").
-:- include("error").
-:- include("freeze").
-
+% Module
 :- module(clpz, [
-                 op(760, yfx, #<==>),
-                 op(750, xfy, #==>),
-                 op(750, yfx, #<==),
-                 op(740, yfx, #\/),
-                 op(730, yfx, #\),
-                 op(720, yfx, #/\),
-                 op(710,  fy, #\),
-                 op(700, xfx, #>),
-                 op(700, xfx, #<),
-                 op(700, xfx, #>=),
-                 op(700, xfx, #=<),
-                 op(700, xfx, #=),
-                 op(700, xfx, #\=),
-                 op(700, xfx, in),
-                 op(700, xfx, ins),
-                 op(450, xfx, ..), % should bind more tightly than \/
-                 op(150, fx, #),
+                 % op(760, yfx, #<==>),
+                 % op(750, xfy, #==>),
+                 % op(750, yfx, #<==),
+                 % op(740, yfx, #\/),
+                 % op(730, yfx, #\),
+                 % op(720, yfx, #/\),
+                 % op(710,  fy, #\),
+                 % op(700, xfx, #>),
+                 % op(700, xfx, #<),
+                 % op(700, xfx, #>=),
+                 % op(700, xfx, #=<),
+                 % op(700, xfx, #=),
+                 % op(700, xfx, #\=),
+                 % op(700, xfx, in),
+                 % op(700, xfx, ins),
+                 % op(450, xfx, ..), % should bind more tightly than \/
+                 % op(150, fx, #),
                  (#>)/2,
                  (#<)/2,
                  (#>=)/2,
@@ -122,20 +114,13 @@
 
 
 :- use_module(library(assoc), [empty_assoc/1,assoc_to_list/2,get_assoc/3,put_assoc/4]).
-:- use_module(library(pairs), [pairs_keys_values/3,pairs_keys/2,pairs_values/2,map_list_to_pairs/3]).
+% :- use_module(library(pairs), [pairs_keys_values/3,pairs_keys/2,pairs_values/2,map_list_to_pairs/3]).
 :- use_module(library(between), [between/3]).
-:- use_module(library(lists), [append/2,append/3,foldl/4,foldl/5,maplist/2,maplist/3,maplist/4,member/2,select/3,same_length/2,sum_list/2,reverse/2,nth0/3,nth1/3,length/2]).
+:- use_module(library(lists), [append/2,append/3,exclude/3,include/3,maplist/2,maplist/3,maplist/4,member/2,same_length/2,select/3,reverse/2,nth0/3,nth1/3,length/2,partition/5]).
 :- use_module(library(atts)).
-:- use_module(library(iso_ext)).
-:- use_module(library(dcgs), [phrase/2,phrase/3]).
+:- use_module(library(samsort)).
 % :- use_module(library(terms)).
-:- use_module(library(error), [domain_error/3,type_error/3,can_be/2]).
-:- use_module(library(si), [list_si/1]).
-:- use_module(library(freeze)).
-:- use_module(library(debug)).
-:- use_module(library(format)).
-
-% :- use_module(library(types)).
+:- use_module(library(types)).
 
 :- attribute
         clpz/1,
@@ -172,14 +157,39 @@ monotonic.
 seq([]) --> [].
 seq([E|Es]) --> [E], seq(Es).
 
+succ(S0, S) :-
+    var(S0),
+    var(S),
+    throw(error(instantiation_error,succ/2)).
+succ(S0, S) :-
+   (    var(S0)
+    ->  integer(S),
+        S0 is S-1
+    ;   integer(S0),
+        S is S0+1
+    ),
+    S0 @>= 0.
+
 cyclic_term(T) :-
         \+ acyclic_term(T).
 
+list_si(Es0) :-
+    prolog:'$list_info'(Es0,_,Es),
+    '@list_si'(Es0, Es).
+
+'@list_si'(_, Es) :-
+    var(Es),
+    throw(error(instantiation_error,list_si/1)).
+'@list_si'(Es0, Es) :-
+    Es \= [],
+    throw(error(type_error(list,Es0),list_si/1)).
+'@list_si'(_, []).
+
 must_be(What, Term) :- must_be(What, unknown(Term)-1, Term).
 
-must_be(Type, _, Term) :-
+must_be(Type, Goal-Arg, Term) :-
         \+ member(Type, [ground,acyclic,list,list(_)]),
-        error:must_be(Type, Term).
+        must_be(Term, Type, Goal, Arg).
 must_be(ground, _, Term) :-
         (   ground(Term) -> true
         ;   instantiation_error(Term)
@@ -207,9 +217,32 @@ instantiation_error(_, Goal-Arg) :-
 domain_error(Expectation, Term) :-
         domain_error(Expectation, Term, unknown(Term)-1).
 
+domain_error(Expectation, Term, Goal-Arg) :-
+        throw(error(domain_error(Expectation, Term), domain_error(Goal, Arg, Expectation, Term))).
+
 type_error(Expectation, Term) :-
         type_error(Expectation, Term, unknown(Term)-1).
 
+type_error(Expectation, Term, Goal-Arg) :-
+        throw(error(type_error(Expectation, Term), type_error(Goal, Arg, Expectation, Term))).
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   foldl/4
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+:- meta_predicate(foldl(3,?,?,?)).
+
+foldl(Goal_3, Ls, A0, A) :-
+    lists:scanlist(Goal_3, Ls, A0, A).
+
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   foldl/5
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+:- meta_predicate(foldl(4,?,?,?,?)).
+
+foldl(Goal_4, Xs, Ys, A0, A) :-
+    lists:scanlist(Goal_4, Xs, Ys, A0, A).
 
 :- meta_predicate(partition(1, ?, ?, ?)).
 
@@ -217,42 +250,27 @@ partition(Pred, Ls0, As, Bs) :-
         include(Pred, Ls0, As),
         exclude(Pred, Ls0, Bs).
 
-
-partition(_O_2, [], [], [], []).
-partition(O_2, [X|Xs], Ls, Es, Gs) :-
-    call(O_2, X, R),
-    partition_(R, X, O_2, Xs, Ls, Es, Gs).
-
-partition_(<, X, O_2, Xs, [X|Ls], Es, Gs) :-
-    partition(O_2, Xs, Ls, Es, Gs).
-partition_(=, X, O_2, Xs, Ls, [X|Es], Gs) :-
-    partition(O_2, Xs, Ls, Es, Gs).
-partition_(>, X, O_2, Xs, Ls, Es, [X|Gs]) :-
-    partition(O_2, Xs, Ls, Es, Gs).
+sum_list(Ls, S) :- lists:sumlist(Ls, S).
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   include/3 and exclude/3
+  Pairs.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-:- meta_predicate(include(1, ?, ?)).
+pairs_keys_values([], [], []).
+pairs_keys_values([A-B|ABs], [A|As], [B|Bs]) :-
+        pairs_keys_values(ABs, As, Bs).
 
-include(_, [], []).
-include(Goal, [L|Ls0], Ls) :-
-        (   call(Goal, L) ->
-            Ls = [L|Rest]
-        ;   Ls = Rest
-        ),
-        include(Goal, Ls0, Rest).
+pairs_keys(Ps, Ks) :- pairs_keys_values(Ps, Ks, _).
 
-:- meta_predicate(exclude(1, ?, ?)).
+pairs_values(Ps, Vs) :- pairs_keys_values(Ps, _, Vs).
 
-exclude(_, [], []).
-exclude(Goal, [L|Ls0], Ls) :-
-        (   call(Goal, L) ->
-            Ls = Rest
-        ;   Ls = [L|Rest]
-        ),
-        exclude(Goal, Ls0, Rest).
+map_list_to_pairs(Pred, Ls, Ps) :-
+        map_list_to_pairs2(Ls, Pred, Ps).
+
+map_list_to_pairs2([], _, []).
+map_list_to_pairs2([H|T0], Pred, [K-H|T]) :-
+        call(Pred, H, K),
+        map_list_to_pairs2(T0, Pred, T).
 
 %:- discontiguous clpz:goal_expansion/5.
 
@@ -1040,8 +1058,9 @@ duophrase(NT, As, Bs) :-
 duophrase(NT, As0, As, Bs0, Bs) :-
         call(NT, As0, As, Bs0, Bs).
 
-%:- multifile user:term_expansion/6.
-term_expansion(Term0, Term) :-
+:- multifile(user:term_expansion/6).
+user:term_expansion(Term0, _Layout1, Ids, Term, [], [duodcg|Ids]) :-
+        nonmember(duodcg, Ids),
         nonvar(Term0),
         Term0 = (Head0 ++> Body0),
         Term = (Head :- Body),
@@ -1072,27 +1091,27 @@ duodcg_head(Head0, Head, As0, As, Bs0, Bs) :-
         append(Args0, [As0,As,Bs0,Bs], Args),
         Head =.. [F|Args].
 
+% get_attr(Var, Module, Value) :-
+%     Access =.. [Module,Value],
+%     (var(Var),get_atts(Var, +Access)).
 
-% goal_expansion(get_attr(Var, Module, Value), (var(Var),get_atts(Var, +Access))) :-
-%         Access =.. [Module,Value].
+% put_attr(Var, Module, Value) :-
+%     Access =.. [Module,Value],
+%     put_atts(Var, +Access).
 
-get_attr(Var, Module, Value) :-
-    Access =.. [Module,Value],
-    (var(Var),get_atts(Var, +Access)).
+% del_attr(Var, Module) :-
+%     Access =.. [Module,_],
+%     (var(Var) -> put_atts(Var, -Access);true).
 
-% goal_expansion(put_attr(Var, Module, Value), put_atts(Var, +Access)) :-
-%         Access =.. [Module,Value].
 
-put_attr(Var, Module, Value) :-
-    Access =.. [Module,Value],
-    put_atts(Var, +Access).
+goal_expansion(get_attr(Var, Module, Value), _, clpz, (var(Var),get_atts(Var, +Access)), []) :-
+        Access =.. [Module,Value].
 
-% goal_expansion(del_attr(Var, Module), (var(Var) -> put_atts(Var, -Access);true)) :-
-%         Access =.. [Module,_].
+goal_expansion(put_attr(Var, Module, Value), _, clpz, put_atts(Var, +Access), []) :-
+        Access =.. [Module,Value].
 
-del_attr(Var, Module) :-
-    Access =.. [Module,_],
-    (var(Var) -> put_atts(Var, -Access);true).
+goal_expansion(del_attr(Var, Module), _, clpz, (var(Var) -> put_atts(Var, -Access);true), []) :-
+        Access =.. [Module,_].
 
 
 % goal_expansion(A cis B, Expansion) :-
@@ -1109,10 +1128,13 @@ A cis B :-
     phrase(cis_goals(B, A), Goals),
     list_goal(Goals, Expansion),
     call(Expansion).
+
 A cis_lt B :-
     B cis_gt A.
+
 A cis_leq B :-
     B cis_geq A.
+
 % Defined elsewhere.
 % A cis_geq B :-
 %      nonvar(A), A = n(N),
@@ -1802,7 +1824,11 @@ clpz_in(V, D) :-
         drep_to_domain(D, Dom),
         domain(V, Dom).
 
-fd_variable(V) :- can_be(integer, V).
+fd_variable(V) :-
+        (   var(V) -> true
+        ;   integer(V) -> true
+        ;   type_error(integer, V)
+        ).
 
 %% ins(+Vars, +Domain)
 %
@@ -3217,13 +3243,6 @@ must_be_fd_integer(X) :-
         ;   must_be(integer, X)
         ).
 
-samsort(Ls0, Ls) :-
-        maplist(as_key, Ls0, LKs0),
-        keysort(LKs0, LKs),
-        maplist(as_key, Ls, LKs).
-
-as_key(E, E-t).
-
 left_right_linsum_const(Left, Right, Cs, Vs, Const) :-
         phrase(linsum(Left, 0, CL), Lefts0, Rights),
         phrase(linsum(Right, 0, CR), Rights0),
@@ -4455,7 +4474,7 @@ tuples_in(Tuples, Relation) :-
 tuples_relation([], _) --> [].
 tuples_relation([Tuple|Tuples], Relation) -->
         { relation_unifiable(Relation, Tuple, Us, _, _) },
-        (   ground(Tuple) -> { memberchk(Tuple, Relation) }
+        (   ground(Tuple) -> { once(member(Tuple, Relation)) }
         ;   tuple_domain(Tuple, Us),
             (   Tuple = [_,_|_] -> tuple_freeze(Tuple, Us)
             ;   []
@@ -4480,7 +4499,7 @@ tuple_domain([T|Ts], Relation0) -->
         tuple_domain(Ts, Relation1).
 
 tuple_freeze(Tuple, Relation) -->
-        (   ground(Tuple) -> { memberchk(Tuple, Relation) }
+        (   ground(Tuple) -> { once(member(Tuple, Relation)) }
         ;   { put_attr(R, clpz_relation, Relation),
               make_propagator(rel_tuple(R, Tuple), Prop) },
             tuple_freeze_(Tuple, Prop)
@@ -4606,7 +4625,7 @@ run_propagator(rel_tuple(R, Tuple), MState) -->
         (   { ground(Tuple) } ->
             kill(MState),
             { del_attr(R, clpz_relation),
-              memberchk(Tuple, Relation) }
+              once(member(Tuple, Relation)) }
         ;   { relation_unifiable(Relation, Tuple, Us, false, Changed),
               Us = [_|_] },
             (   { Tuple = [First,Second], ( ground(First) ; ground(Second) ) } ->
@@ -5124,11 +5143,21 @@ run_propagator(pmod(X,Y,Z), MState) -->
         ;   nonvar(Z), nonvar(X) ->
             (   Z > 0 ->
                 (   X < 0 -> true
-                ;   X >= Z
+                ;   X >= Z,
+                    % due to X = Z+Y*_ and Y > Z
+                    (   X-Z > 0 ->
+                        X-Z > Z
+                    ;   true
+                    )
                 )
             ;   Z < 0 ->
                 (   X > 0 -> true
-                ;   X =< Z
+                ;   X =< Z,
+                    % due to X = Z+Y*_ and Y < Z
+                    (   X-Z < 0 ->
+                        X-Z < Z
+                    ;   true
+                    )
                 )
             ;   Z =:= 0 % Multiple solutions so do nothing special.
             ),
@@ -5136,7 +5165,23 @@ run_propagator(pmod(X,Y,Z), MState) -->
                   YU < X, X =< 0 } -> kill(MState), Z =:= X
             ;   { fd_get(Y, _, n(YL), _, _),
                   YL > X, X >= 0 } -> kill(MState), Z =:= X
-            ;   (   Z > 0 ->
+            ;   (   Z > 0, X < 0 ->
+                    { fd_get(Y, YD, YPs),
+                      YMin is Z+1,
+                      YMax is Z-X,
+                      domain_remove_smaller_than(YD, YMin, YD1),
+                      domain_remove_greater_than(YD1, YMax, YD2) },
+                    fd_put(Y, YD2, YPs)
+                    % queue_goal((Y #> Z, Y #=< Z-X))
+                ;   Z < 0, X > 0 ->
+                    { fd_get(Y, YD, YPs),
+                      YMax is Z-1,
+                      YMin is Z-X,
+                      domain_remove_greater_than(YD, YMax, YD1),
+                      domain_remove_smaller_than(YD1, YMin, YD2) },
+                    fd_put(Y, YD2, YPs)
+                    % queue_goal((Y #< Z, Y #>= Z-X))
+                ;   Z > 0 ->
                     { fd_get(Y, YD, YPs),
                       YMin is Z + 1,
                       domain_remove_smaller_than(YD, YMin, YD1) },
@@ -5148,7 +5193,16 @@ run_propagator(pmod(X,Y,Z), MState) -->
                       domain_remove_greater_than(YD, YMax, YD1) },
                     fd_put(Y, YD1, YPs)
                     % queue_goal(Y #< Z)
-                ;   true
+                ;   Z =:= 0,
+                    (   X =:= 0 ->
+                        kill(MState) % trivial
+                    ;   % only 4 solutions {-abs(X),-1,1,abs(X)}
+                        { YL is -abs(X), YU is abs(X),
+                          fd_get(Y, YD0, YPs),
+                          domain_remove_smaller_than(YD0, YL, YD1),
+                          domain_remove_greater_than(YD1, YU, YD) },
+                        fd_put(Y, YD, YPs)
+                    )
                 )
             )
         ;   run_propagator(pmodz(X,Y,Z), MState),
@@ -5726,7 +5780,7 @@ run_propagator(reified_tuple_in(Tuple, R, B), MState) -->
         (   B == 1 -> kill(MState), { tuples_in([Tuple], Relation) }
         ;   (   ground(Tuple) ->
                 kill(MState),
-                (   { memberchk(Tuple, Relation) } -> B = 1
+                (   { member(Tuple, Relation) } -> B = 1
                 ;   B = 0
                 )
             ;   { relation_unifiable(Relation, Tuple, Us, _, _) },
@@ -6145,7 +6199,7 @@ domain_to_list(Domain, List) :- phrase(domain_to_list(Domain), List).
 domain_to_list(split(_, Left, Right)) -->
         domain_to_list(Left), domain_to_list(Right).
 domain_to_list(empty)                 --> [].
-domain_to_list(from_to(n(F),n(T)))    --> { N is T-F+1, length(Ns, N), [F|_] = Ns, chain_(succ, Ns) }, seq(Ns).
+domain_to_list(from_to(n(F),n(T)))    --> { findall(N, between(F, T, N), Ns) }, seq(Ns).
 
 difference_arcs([], []) --> [].
 difference_arcs([V|Vs], FL0) -->
@@ -6158,7 +6212,7 @@ difference_arcs([V|Vs], FL0) -->
 
 writeln(T) :- write(T), nl.
 
-:- meta_predicate must_succeed(0).
+:- meta_predicate(must_succeed(0)).
 
 must_succeed(G) :-
         (   call(G) -> true
@@ -6282,7 +6336,7 @@ put_free(F) :- put_attr(F, free, true).
 
 free_node(F) :- get_attr(F, free, true).
 
-:- meta_predicate with_local_attributes(?, 0, ?).
+:- meta_predicate(with_local_attributes(?, 0, ?)).
 
 :- dynamic(nat_copy/1).
 
@@ -6294,7 +6348,7 @@ with_local_attributes(Vars, Goal, Result) :-
                % we made during propagation, and unify the variables
                % in the thrown copy with Vars in order to get the
                % intended variables in Result.
-               copy_term_nat(Vars-Result, Copy),
+               copy_term(Vars-Result, Copy),
                throw(local_attributes(Copy))),
               local_attributes(Vars-Result),
               true).
@@ -7381,7 +7435,7 @@ a_not_in_b([_,AX,AW,AY,AH], [_,BX,BW,BY,BH]) :-
 % ;  false.
 % ```
 
-automaton(Sigs, Ns, As) :- automaton(_, _, Sigs, Ns, As, [], [], _).
+automaton(Sigs, Ns, As) :- automaton(Sigs, _, Sigs, Ns, As, [], [], _).
 
 
 %% automaton(+Sequence, ?Template, +Signature, +Nodes, +Arcs, +Counters, +Initials, ?Finals)
@@ -7847,6 +7901,10 @@ attribute_goals(X) -->
         ),
         attributes_goals(Ps),
         { del_attr(X, clpz) }.
+
+attribute_goal(Var, Goal) :-
+        phrase(attribute_goals(Var), Goals),
+        list_goal(Goals, Goal).
 
 attributes_goals([]) --> [].
 attributes_goals([propagator(P, State)|As]) -->

@@ -103,7 +103,7 @@ label(Vs) :- labeling([], Vs).
 labeling(Options, Vars) :-
         must_be(list, labeling(Options, Vars)-1, Options),
         fd_must_be_list(Vars, labeling(Options, Vars)-2),
-        maplist(finite_domain(labeling(Options, Vars), 2), Vars),
+        list_map(finite_domain(labeling(Options, Vars), 2), Vars),
         label(Options, Options, default(leftmost), default(up), default(step), [], upto_ground, Vars).
 
 
@@ -135,10 +135,10 @@ label([O|Os], Options, Selection, Order, Choice, Optim, Consistency, Vars) :-
         ;   domain_error(labeling_option, O)
         ).
 label([], _, Selection, Order, Choice, Optim0, Consistency, Vars) :-
-        maplist(arg(1), [Selection,Order,Choice], [S,O,C]),
+        list_map(arg(1), [Selection,Order,Choice], [S,O,C]),
         (   Optim0 == [] ->
             label(Vars, S, O, C, Consistency)
-        ;   reverse(Optim0, Optim),
+        ;   list_reversed(Optim0, Optim),
             exprs_singlevars(Optim, SVs),
             call_cleanup(optimise(Vars, [S,O,C], SVs),
                          retractall(extremum(_)))
@@ -154,24 +154,16 @@ exprs_singlevars([E|Es], [SV|SVs]) :-
         SV =.. [F,Single],
         exprs_singlevars(Es, SVs).
 
-all_dead(fd_props(Bs,Gs,Os)) :-
-        all_dead_(Bs),
-        all_dead_(Gs),
-        all_dead_(Os).
-
-all_dead_([]).
-all_dead_([propagator(_, S)|Ps]) :- S == dead, all_dead_(Ps).
-
 label(Vars, Selection, Order, Choice, Consistency) :-
         (   Vars = [] -> (Consistency = upto_in(I0,I) -> I0 = I ; true)
         ;   Vars = [V|Vs], nonvar(V) -> label(Vs, Selection, Order, Choice, Consistency)
         ;   select_var(Selection, Vars, Var, RVars),
             (   var(Var) ->
-                (   Consistency = upto_in(I0,I), fd_get(Var, _, Ps), all_dead(Ps) ->
+                (   Consistency = upto_in(I0,I), fd_get(Var, _, Ps), propagators_dead(Ps) ->
                     fd_size(Var, Size),
                     I1 is I0*Size,
                     label(RVars, Selection, Order, Choice, upto_in(I1,I))
-                ;   Consistency = upto_in, fd_get(Var, _, Ps), all_dead(Ps) ->
+                ;   Consistency = upto_in, fd_get(Var, _, Ps), propagators_dead(Ps) ->
                     label(RVars, Selection, Order, Choice, Consistency)
                 ;   choice_order_variable(Choice, Order, Var, RVars, Vars, Selection, Consistency)
                 )
@@ -197,8 +189,8 @@ choice_order_variable(bisect, Order, Var, _, Vars0, Selection, Consistency) :-
         domain_supremum(Dom, n(S)),
         Mid0 is (I + S) // 2,
         (   Mid0 =:= S -> Mid is Mid0 - 1 ; Mid = Mid0 ),
-        (   Order == up -> ( Var #=< Mid ; Var #> Mid )
-        ;   Order == down -> ( Var #> Mid ; Var #=< Mid )
+        (   Order == up -> ( #Var #=< Mid ; #Var #> Mid )
+        ;   Order == down -> ( #Var #> Mid ; #Var #=< Mid )
         ;   domain_error(bisect_up_or_down, Order)
         ),
         label(Vars0, Selection, Order, bisect, Consistency).
@@ -282,25 +274,19 @@ find_ffc([V|Vs], Prev, FFC) :-
 
 ffc_lt(X, Y) :-
         (   fd_get(X, XD, XPs) ->
-            domain_num_elements(XD, n(NXD))
+            domain_length(XD, n(NXD))
         ;   NXD = 1, XPs = []
         ),
         (   fd_get(Y, YD, YPs) ->
-            domain_num_elements(YD, n(NYD))
+            domain_length(YD, n(NYD))
         ;   NYD = 1, YPs = []
         ),
         (   NXD < NYD -> true
         ;   NXD =:= NYD,
-            props_number(XPs, NXPs),
-            props_number(YPs, NYPs),
+            propagators_number(XPs, NXPs),
+            propagators_number(YPs, NYPs),
             NXPs > NYPs
         ).
-
-props_number(fd_props(Gs,Bs,Os), N) :-
-        length(Gs, N1),
-        length(Bs, N2),
-        length(Os, N3),
-        N is N1 + N2 + N3.
 
 min_lt(X,Y) :- bounds(X,LX,_), bounds(Y,LY,_), LX < LY.
 

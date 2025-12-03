@@ -36,4 +36,4 @@ get_atts(Var, -A) :-
 
 verify(Var, Other, Gs0, Gs) :-
     verify_attributes(Var, Other, Gs1),
-    append(Gs1, Gs, Gs0).
+    list_append(Gs1, Gs, Gs0).

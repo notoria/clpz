@@ -47,15 +47,15 @@ cumulative(Tasks, Options) :-
         ),
         (   Tasks = [] -> true
         ;   fully_elastic_relaxation(Tasks, L),
-            maplist(task_bs, Tasks, Bss),
-            maplist(arg(1), Tasks, Starts),
-            maplist(fd_inf, Starts, MinStarts),
-            maplist(arg(3), Tasks, Ends),
-            maplist(fd_sup, Ends, MaxEnds),
+            list_map(task_bs, Tasks, Bss),
+            list_map(arg(1), Tasks, Starts),
+            list_map(fd_inf, Starts, MinStarts),
+            list_map(arg(3), Tasks, Ends),
+            list_map(fd_sup, Ends, MaxEnds),
             MinStarts = [Min|Mins],
-            foldl(min_, Mins, Min, Start),
+            list_foldl(min_, Mins, Min, Start),
             MaxEnds = [Max|Maxs],
-            foldl(max_, Maxs, Max, End),
+            list_foldl(max_, Maxs, Max, End),
             resource_limit(Start, End, Tasks, Bss, L)
         ).
 
@@ -65,27 +65,27 @@ cumulative(Tasks, Options) :-
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 fully_elastic_relaxation(Tasks, Limit) :-
-        maplist(task_duration_consumption, Tasks, Ds, Cs),
-        maplist(area, Ds, Cs, As),
+        list_map(task_duration_consumption, Tasks, Ds, Cs),
+        list_map(area, Ds, Cs, As),
         sum(As, #=, #Area),
-        #MinTime #= (Area + Limit - 1) // Limit,
+        #MinTime #= (#Area + #Limit - #1) // #Limit,
         tasks_minstart_maxend(Tasks, MinStart, MaxEnd),
-        MaxEnd #>= MinStart + MinTime.
+        #MaxEnd #>= #MinStart + #MinTime.
 
 task_duration_consumption(task(_,D,_,C,_), D, C).
 
 area(X, Y, Area) :- #Area #= #X * #Y.
 
 tasks_minstart_maxend(Tasks, Start, End) :-
-        maplist(task_start_end, Tasks, [Start0|Starts], [End0|Ends]),
-        foldl(min_, Starts, Start0, Start),
-        foldl(max_, Ends, End0, End).
+        list_map(task_start_end, Tasks, [Start0|Starts], [End0|Ends]),
+        list_foldl(min_, Starts, Start0, Start),
+        list_foldl(max_, Ends, End0, End).
 
-max_(E, M0, M) :- #M #= max(E, M0).
+max_(E, M0, M) :- #M #= max(#E,#M0).
 
-min_(E, M0, M) :- #M #= min(E, M0).
+min_(E, M0, M) :- #M #= min(#E,#M0).
 
-task_start_end(task(Start,_,End,_,_), #Start, #End).
+task_start_end(task(Start,_,End,_,_), Start, End).
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    All time slots must respect the resource limit.
@@ -94,37 +94,37 @@ task_start_end(task(Start,_,End,_,_), #Start, #End).
 resource_limit(T0, T, Tasks, Bss, L) :-
     (   T0 = T
     ->  true
-    ;   maplist(contribution_at(T0), Tasks, Bss, Cs),
+    ;   list_map(contribution_at(T0), Tasks, Bss, Cs),
         sum(Cs, #=<, L),
-        T1 is T0 + 1,
+        integer_add(1, T0, T1),
         resource_limit(T1, T, Tasks, Bss, L)
     ).
 
 task_bs(Task, InfStart-Bs) :-
         Task = task(Start,D,End,_,_Id),
-        #D #> 0,
+        #D #> #0,
         #End #= #Start + #D,
-        maplist(finite_domain, [End,Start,D]),
+        list_map(finite_domain, [End,Start,D]),
         fd_inf(Start, InfStart),
         fd_sup(End, SupEnd),
-        L is SupEnd - InfStart,
-        length(Bs, L),
+        integer_add(L, InfStart, SupEnd), % L #= SupEnd-InfStart,
+        list_length(Bs, L),
         task_running(Bs, Start, End, InfStart).
 
 task_running([], _, _, _).
-task_running([B|Bs], Start, End, T) :-
-        ((T #>= Start) #/\ (T #< End)) #<==> #B,
-        T1 is T + 1,
+task_running([B|Bs], Start, End, T0) :-
+        ((#T0 #>= #Start) #/\ (#T0 #< #End)) #<==> #B,
+        integer_add(1, T0, T1),
         task_running(Bs, Start, End, T1).
 
 contribution_at(T, Task, Offset-Bs, Contribution) :-
         Task = task(Start,_,End,C,_),
-        #C #>= 0,
+        #C #>= #0,
         fd_inf(Start, InfStart),
         fd_sup(End, SupEnd),
         (   T < InfStart -> Contribution = 0
         ;   T >= SupEnd -> Contribution = 0
-        ;   Index is T - Offset,
-            nth0(Index, Bs, B),
-            #Contribution #= B*C
+        ;   integer_add(Index, Offset, T), % Index #= T-Offset
+            list_nth0(Index, Bs, B),
+            #Contribution #= #B * #C
         ).

@@ -4,30 +4,31 @@
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 reinforce(X) :-
-        term_variables(X, Vs),
-        maplist(reinforce_, Vs).
+    term_variables(X, Vs),
+    list_map('@reinforce', Vs).
 
-reinforce_(X) :-
-        (   fd_var(X), fd_get(X, Dom, Ps) ->
-            put_full(X, Dom, Ps)
-        ;   true
-        ).
+'@reinforce'(X) :-
+    (   fd_var(X),
+        fd_get(X, Dom, Ps)
+    ->  '@reinforce'(X, Dom, Ps)
+    ;   true
+    ).
 
-put_full(X, Dom, Ps) :-
-        Dom \== empty,
-        (   Dom = from_to(F, F) -> F = n(X)
+'@reinforce'(X, Dom, Ps) :-
+        domain_empty(Dom, false),
+        (   domain_singleton(Dom, F) -> F = n(X)
         ;   (   get_attr(X, clpz, Attr) ->
                 Attr = clpz_attr(_,_,_,OldDom, _OldPs,Q),
                 put_attr(X, clpz, clpz_attr(no,no,no,Dom,Ps,Q)),
                 %format("putting dom: ~w\n", [Dom]),
                 (   OldDom == Dom -> true
-                ;   new_queue(Q), % TODO: queue?
-                    phrase((trigger_props(Ps, X, OldDom, Dom),
-                            do_queue), [Q], _)
+                ;   queue_empty(Q), % TODO: queue?
+                    phrase((propagators_queuegb(Ps, X, OldDom, Dom),
+                            propagator_catalyze), [Q], _)
                 )
             ;   var(X) -> %format('\t~w in ~w .. ~w\n',[X,L,U]),
-                new_queue(Q),
+                queue_empty(Q),
                 put_attr(X, clpz, clpz_attr(no,no,no,Dom,Ps,Q))
-            ;   true
+            ;   true % QUESTION: why? Shouldn't `X` be a variable? What about the constraints?
             )
         ).

@@ -40,128 +40,126 @@
 */
 
 
+:- flag(occurs_check, false).
 :- include("../core").
-:- include("../assoc").
-:- include("../pairs").
+:- include("between").
 :- include("../lists").
+:- include("../assoc").
+:- include("../list").
+:- include("../pair").
 :- include("../atts").
 :- include("../dcg").
 :- include("../error").
+:- include("must_be").
 :- include("../freeze").
 
-:- module(clpz, [
-                 op(760, yfx, #<==>),
-                 op(750, xfy, #==>),
-                 op(750, yfx, #<==),
-                 op(740, yfx, #\/),
-                 op(730, yfx, #\),
-                 op(720, yfx, #/\),
-                 op(710,  fy, #\),
-                 op(700, xfx, #>),
-                 op(700, xfx, #<),
-                 op(700, xfx, #>=),
-                 op(700, xfx, #=<),
-                 op(700, xfx, #=),
-                 op(700, xfx, #\=),
-                 op(700, xfx, in),
-                 op(700, xfx, ins),
-                 op(450, xfx, ..), % should bind more tightly than \/
-                 op(150, fx, #),
-                 (#>)/2,
-                 (#<)/2,
-                 (#>=)/2,
-                 (#=<)/2,
-                 (#=)/2,
-                 (#\=)/2,
-                 (#\)/1,
-                 (#<==>)/2,
-                 (#==>)/2,
-                 (#<==)/2,
-                 (#\/)/2,
-                 (#\)/2,
-                 (#/\)/2,
-                 (in)/2,
-                 (ins)/2,
-                 all_different/1,
-                 all_distinct/1,
-                 nvalue/2,
-                 sum/3,
-                 scalar_product/4,
-                 tuples_in/2,
-                 labeling/2,
-                 label/1,
-                 indomain/1,
-                 lex_chain/1,
-                 serialized/2,
-                 global_cardinality/2,
-                 global_cardinality/3,
-                 circuit/1,
-                 cumulative/1,
-                 cumulative/2,
-                 disjoint2/1,
-                 element/3,
-                 automaton/3,
-                 automaton/8,
-                 zcompare/3,
-                 chain/2,
-                 fd_var/1,
-                 fd_inf/2,
-                 fd_sup/2,
-                 fd_size/2,
-                 fd_dom/2,
-
-                 % for use in predicates from library(reif)
-                 clpz_t/2,
-                 (#=)/3,
-                 (#<)/3
-
-                 % called from goal_expansion
-                 % clpz_equal/2,
-                 % clpz_geq/2
-                ]).
-
-
-:- use_module(library(assoc), [empty_assoc/1,assoc_to_list/2,get_assoc/3,put_assoc/4]).
-:- use_module(library(pairs), [pairs_keys_values/3,pairs_keys/2,pairs_values/2,map_list_to_pairs/3]).
-:- use_module(library(between), [between/3]).
-:- use_module(library(lists), [append/2,append/3,foldl/4,foldl/5,maplist/2,maplist/3,maplist/4,member/2,select/3,same_length/2,sum_list/2,reverse/2,nth0/3,nth1/3,length/2]).
-:- use_module(library(atts)).
-:- use_module(library(iso_ext)).
-:- use_module(library(dcgs), [phrase/2,phrase/3]).
-% :- use_module(library(terms)).
-:- use_module(library(error), [domain_error/3,type_error/3,can_be/2]).
-:- use_module(library(si), [list_si/1]).
-:- use_module(library(freeze)).
-:- use_module(library(debug)).
-:- use_module(library(format)).
-
+% Module
+% :- module(clpz, [
+%                  % op(760, yfx, #<==>),
+%                  % op(750, xfy, #==>),
+%                  % op(750, yfx, #<==),
+%                  % op(740, yfx, #\/),
+%                  % op(730, yfx, #\),
+%                  % op(720, yfx, #/\),
+%                  % op(710,  fy, #\),
+%                  % op(700, xfx, #>),
+%                  % op(700, xfx, #<),
+%                  % op(700, xfx, #>=),
+%                  % op(700, xfx, #=<),
+%                  % op(700, xfx, #=),
+%                  % op(700, xfx, #\=),
+%                  % op(700, xfx, in),
+%                  % op(700, xfx, ins),
+%                  % op(450, xfx, ..), % should bind more tightly than \/
+%                  % op(150, fx, #),
+%                  (#>)/2,
+%                  (#<)/2,
+%                  (#>=)/2,
+%                  (#=<)/2,
+%                  (#=)/2,
+%                  (#\=)/2,
+%                  (#\)/1,
+%                  (#<==>)/2,
+%                  (#==>)/2,
+%                  (#<==)/2,
+%                  (#\/)/2,
+%                  (#\)/2,
+%                  (#/\)/2,
+%                  (in)/2,
+%                  (ins)/2,
+%                  all_different/1,
+%                  all_distinct/1,
+%                  nvalue/2,
+%                  sum/3,
+%                  scalar_product/4,
+%                  tuples_in/2,
+%                  labeling/2,
+%                  label/1,
+%                  indomain/1,
+%                  lex_chain/1,
+%                  serialized/2,
+%                  global_cardinality/2,
+%                  global_cardinality/3,
+%                  circuit/1,
+%                  cumulative/1,
+%                  cumulative/2,
+%                  disjoint2/1,
+%                  element/3,
+%                  automaton/3,
+%                  automaton/8,
+%                  zcompare/3,
+%                  chain/2,
+%                  fd_var/1,
+%                  fd_inf/2,
+%                  fd_sup/2,
+%                  fd_size/2,
+%                  fd_dom/2,
+% 
+%                  % for use in predicates from library(reif)
+%                  clpz_t/2,
+%                  (#=)/3,
+%                  (#<)/3
+% 
+%                  % called from goal_expansion
+%                  % clpz_equal/2,
+%                  % clpz_geq/2
+%                 ]).
+% 
+% 
+% :- use_module(library(assoc), [empty_assoc/1,assoc_to_list/2,get_assoc/3,put_assoc/4]).
+% % :- use_module(library(pairs), [pairs_keys_values/3,pairs_keys/2,pairs_values/2,map_list_to_pairs/3]).
+% :- use_module(library(between), [between/3]).
+% :- use_module(library(lists), [append/2,append/3,exclude/3,include/3,maplist/2,maplist/3,maplist/4,member/2,same_length/2,select/3,reverse/2,nth0/3,nth1/3,length/2,partition/5]).
+% :- use_module(library(atts)).
+% :- use_module(library(samsort)).
+% % :- use_module(library(terms)).
 % :- use_module(library(types)).
 
-:- attribute
-        clpz/1,
-        clpz_aux/1,
-        clpz_relation/1,
-        edges/1,
-        flow/1,
-        parent/1,
-        free/1,
-        g0_edges/1,
-        used/1,
-        lowlink/1,
-        value/1,
-        visited/1,
-        index/1,
-        in_stack/1,
-        clpz_gcc_vs/1,
-        clpz_gcc_num/1,
-        clpz_gcc_occurred/1,
-        queue/2,
-        disabled/0.
-
-:- dynamic(monotonic/0).
-:- dynamic(clpz_equal_/2).
-:- dynamic(clpz_geq_/2).
-:- dynamic(clpz_neq/2).
+% :- attribute
+%         clpz/1,
+%         clpz_aux/1,
+%         clpz_relation/1,
+%         edges/1,
+%         flow/1,
+%         parent/1,
+%         free/1,
+%         g0_edges/1,
+%         used/1,
+%         lowlink/1,
+%         value/1,
+%         visited/1,
+%         index/1,
+%         in_stack/1,
+%         clpz_gcc_vs/1,
+%         clpz_gcc_num/1,
+%         clpz_gcc_occurred/1,
+%         queue/2,
+%         disabled/0.
+% 
+% :- dynamic(monotonic/0).
+% :- dynamic(clpz_equal_/2).
+% :- dynamic(clpz_geq_/2).
+% :- dynamic(clpz_neq/2).
 
 monotonic.
 
@@ -172,14 +170,39 @@ monotonic.
 seq([]) --> [].
 seq([E|Es]) --> [E], seq(Es).
 
+succ(S0, S) :-
+    var(S0),
+    var(S),
+    throw(error(instantiation_error,succ/2)).
+succ(S0, S) :-
+   (    var(S0)
+    ->  integer(S),
+        S0 is S-1
+    ;   integer(S0),
+        S is S0+1
+    ),
+    S0 @>= 0.
+
 cyclic_term(T) :-
         \+ acyclic_term(T).
 
+% list_si(Es0) :-
+%     prolog:'$list_info'(Es0,_,Es),
+%     '@list_si'(Es0, Es).
+% 
+% '@list_si'(_, Es) :-
+%     var(Es),
+%     throw(error(instantiation_error,list_si/1)).
+% '@list_si'(Es0, Es) :-
+%     Es \= [],
+%     throw(error(type_error(list,Es0),list_si/1)).
+% '@list_si'(_, []).
+
 must_be(What, Term) :- must_be(What, unknown(Term)-1, Term).
 
-must_be(Type, _, Term) :-
+must_be(Type, Goal-Arg, Term) :-
         \+ member(Type, [ground,acyclic,list,list(_)]),
-        error:must_be(Type, Term).
+        must_be(Term, Type, Goal, Arg).
 must_be(ground, _, Term) :-
         (   ground(Term) -> true
         ;   instantiation_error(Term)
@@ -207,28 +230,40 @@ instantiation_error(_, Goal-Arg) :-
 domain_error(Expectation, Term) :-
         domain_error(Expectation, Term, unknown(Term)-1).
 
+% domain_error(Expectation, Term, Goal-Arg) :-
+%         throw(error(domain_error(Expectation, Term), domain_error(Goal, Arg, Expectation, Term))).
+
 type_error(Expectation, Term) :-
         type_error(Expectation, Term, unknown(Term)-1).
 
+% type_error(Expectation, Term, Goal-Arg) :-
+%         throw(error(type_error(Expectation, Term), type_error(Goal, Arg, Expectation, Term))).
 
-:- meta_predicate(partition(1, ?, ?, ?)).
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   foldl/4
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-partition(Pred, Ls0, As, Bs) :-
-        include(Pred, Ls0, As),
-        exclude(Pred, Ls0, Bs).
+% :- meta_predicate(foldl(3,?,?,?)).
+% 
+% foldl(Goal_3, Ls, A0, A) :-
+%     lists:scanlist(Goal_3, Ls, A0, A).
 
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   foldl/5
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-partition(_O_2, [], [], [], []).
-partition(O_2, [X|Xs], Ls, Es, Gs) :-
-    call(O_2, X, R),
-    partition_(R, X, O_2, Xs, Ls, Es, Gs).
-
-partition_(<, X, O_2, Xs, [X|Ls], Es, Gs) :-
-    partition(O_2, Xs, Ls, Es, Gs).
-partition_(=, X, O_2, Xs, Ls, [X|Es], Gs) :-
-    partition(O_2, Xs, Ls, Es, Gs).
-partition_(>, X, O_2, Xs, Ls, Es, [X|Gs]) :-
-    partition(O_2, Xs, Ls, Es, Gs).
+% :- meta_predicate(foldl(4,?,?,?,?)).
+% 
+% foldl(Goal_4, Xs, Ys, A0, A) :-
+%     lists:scanlist(Goal_4, Xs, Ys, A0, A).
+% 
+% :- meta_predicate(partition(1, ?, ?, ?)).
+% 
+% partition(Pred, Ls0, As, Bs) :-
+%         include(Pred, Ls0, As),
+%         exclude(Pred, Ls0, Bs).
+% 
+% sum_list(Ls, S) :- lists:sumlist(Ls, S).
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    include/3 and exclude/3
@@ -255,6 +290,7 @@ exclude(Goal, [L|Ls0], Ls) :-
         exclude(Goal, Ls0, Rest).
 
 %:- discontiguous clpz:goal_expansion/5.
+
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
   Public operators.
@@ -288,7 +324,6 @@ exclude(Goal, [L|Ls0], Ls) :-
 :- op(700, xfx, cis_leq).
 :- op(700, xfx, cis_lt).
 :- op(1200, xfx, ++>).
-:- op(800, xfx, =>).
 
 /** Constraint Logic Programming over Integers
 
@@ -1040,7 +1075,6 @@ duophrase(NT, As, Bs) :-
 duophrase(NT, As0, As, Bs0, Bs) :-
         call(NT, As0, As, Bs0, Bs).
 
-%:- multifile user:term_expansion/6.
 term_expansion(Term0, Term) :-
         nonvar(Term0),
         Term0 = (Head0 ++> Body0),
@@ -1072,31 +1106,28 @@ duodcg_head(Head0, Head, As0, As, Bs0, Bs) :-
         append(Args0, [As0,As,Bs0,Bs], Args),
         Head =.. [F|Args].
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% goal_expansion(get_attr(Var, Module, Value), (var(Var),get_atts(Var, +Access))) :-
-%         Access =.. [Module,Value].
-
 get_attr(Var, Module, Value) :-
     Access =.. [Module,Value],
     (var(Var),get_atts(Var, +Access)).
-
-% goal_expansion(put_attr(Var, Module, Value), put_atts(Var, +Access)) :-
-%         Access =.. [Module,Value].
 
 put_attr(Var, Module, Value) :-
     Access =.. [Module,Value],
     put_atts(Var, +Access).
 
-% goal_expansion(del_attr(Var, Module), (var(Var) -> put_atts(Var, -Access);true)) :-
-%         Access =.. [Module,_].
-
 del_attr(Var, Module) :-
     Access =.. [Module,_],
     (var(Var) -> put_atts(Var, -Access);true).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+goal_expansion(get_attr(Var, Module, Value), (var(Var),get_atts(Var, +Access))) :-
+        Access =.. [Module,Value].
+
+goal_expansion(put_attr(Var, Module, Value), put_atts(Var, +Access)) :-
+        Access =.. [Module,Value].
+
+goal_expansion(del_attr(Var, Module), (var(Var) -> put_atts(Var, -Access);true)) :-
+        Access =.. [Module,_].
+
 
 % goal_expansion(A cis B, Expansion) :-
 %         phrase(cis_goals(B, A), Goals),
@@ -1112,10 +1143,13 @@ A cis B :-
     phrase(cis_goals(B, A), Goals),
     list_goal(Goals, Expansion),
     call(Expansion).
+
 A cis_lt B :-
     B cis_gt A.
+
 A cis_leq B :-
     B cis_geq A.
+
 % Defined elsewhere.
 % A cis_geq B :-
 %      nonvar(A), A = n(N),
@@ -1304,7 +1338,6 @@ cis_slash_(sup, _, n(0)).
 cis_slash_(inf, _, n(0)).
 cis_slash_(n(B), A, n(S)) :- S is A // B.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    A domain is a finite set of disjoint intervals. Internally, domains
@@ -1784,6 +1817,7 @@ intervals_to_domain_(I0, [I1|Is0], D) :-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
 %% in(?Var, +Domain)
 %
 %  Var is an element of Domain. Domain is one of:
@@ -1805,7 +1839,11 @@ clpz_in(V, D) :-
         drep_to_domain(D, Dom),
         domain(V, Dom).
 
-fd_variable(V) :- can_be(integer, V).
+fd_variable(V) :-
+        (   var(V) -> true
+        ;   integer(V) -> true
+        ;   type_error(integer, V)
+        ).
 
 %% ins(+Vars, +Domain)
 %
@@ -1826,8 +1864,6 @@ fd_must_be_list(Ls, Where) :-
         (   fd_var(Ls) -> type_error(list, Ls, Where)
         ;   must_be(list, Where, Ls)
         ).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% indomain(?Var)
 %
@@ -2127,12 +2163,6 @@ ffc_lt(X, Y) :-
             NXPs > NYPs
         ).
 
-props_number(fd_props(Gs,Bs,Os), N) :-
-        length(Gs, N1),
-        length(Bs, N2),
-        length(Os, N3),
-        N is N1 + N2 + N3.
-
 min_lt(X,Y) :- bounds(X,LX,_), bounds(Y,LY,_), LX < LY.
 
 max_gt(X,Y) :- bounds(X,_,UX), bounds(Y,_,UY), UX > UY.
@@ -2151,8 +2181,6 @@ delete_eq([X|Xs], Y, List) :-
         ;   List = [X|Tail],
             delete_eq(Xs, Y, Tail)
         ).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    contracting/1 -- subject to change
@@ -2182,8 +2210,6 @@ contracting([V|Vs], Repeat, Vars) :-
             contracting(Vs, true, Vars)
         ).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    fds_sespsize(Vs, S).
 
@@ -2208,8 +2234,6 @@ fds_sespsize([V|Vs], S0, S) :-
         fd_size_(V, S1),
         S2 cis S0*S1,
         fds_sespsize(Vs, S2, S).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Optimisation uses the clause database to save the computed extremum
@@ -2336,8 +2360,6 @@ nvalue(N, Vars) :-
 
 zero_or_more([], 0).
 zero_or_more([_|_], N) :- N #> 0.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% sum(+Vars, +Rel, ?Expr)
 %
@@ -2590,6 +2612,7 @@ remove_lower([C*X|CXs], Min) -->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Parsing a CLP(ℤ) expression has two important side-effects: First,
    it constrains the variables occurring in the expression to
@@ -2598,7 +2621,7 @@ remove_lower([C*X|CXs], Min) -->
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 constrain_to_integer(Var) :-
-        (   integer(Var) -> true
+        (   nonvar(Var), integer(Var) -> true
         ;   fd_get(Var, D, Ps),
             fd_put(Var, D, Ps)
         ).
@@ -2622,6 +2645,8 @@ power_var_num(P, X, N) :-
    subexpressions recursively. In the body, g(Goal) means again Goal,
    and p(Propagator) means to attach and trigger once a propagator.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+
+:- op(800, xfx, =>).
 
 parse_clpz(E, R,
             [g(cyclic_term(E)) => [g(domain_error(clpz_expression, E))],
@@ -2991,7 +3016,10 @@ match_goal(p(Prop), _) -->
          variables_same_queue(Vs),
          trigger_once_(P, Q)].
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 
 %% #>=(?X, ?Y)
 %
@@ -3018,8 +3046,6 @@ X #=< Y :- Y #>= X.
 X #= Y :- clpz_equal(X, Y).
 
 clpz_equal(X, Y) :- clpz_equal_(X, Y), reinforce(X).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Conditions under which an equality can be compiled to built-in
@@ -3196,7 +3222,7 @@ is_false(var(X)) :- nonvar(X).
 %         clpz_expandable(Goal0),
 %         clpz_expansion(Goal0, Goal).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 linsum(T, S0, S) -->
     (   { var(T) }
@@ -3231,13 +3257,6 @@ must_be_fd_integer(X) :-
         (   var(X) -> constrain_to_integer(X)
         ;   must_be(integer, X)
         ).
-
-samsort(Ls0, Ls) :-
-        maplist(as_key, Ls0, LKs0),
-        keysort(LKs0, LKs),
-        maplist(as_key, Ls, LKs).
-
-as_key(E, E-t).
 
 left_right_linsum_const(Left, Right, Cs, Vs, Const) :-
         phrase(linsum(Left, 0, CL), Lefts0, Rights),
@@ -3275,8 +3294,6 @@ gcd([], G, G).
 gcd([N|Ns], G0, G) :-
         G1 is gcd(N, G0),
         gcd(Ns, G1, G).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 even(N) :- N mod 2 =:= 0.
 
@@ -3366,8 +3383,6 @@ integer_kroot_leq(L, U, N, K, R) :-
             )
         ).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 %% #\=(?X, ?Y)
 %
 % The arithmetic expressions X and Y evaluate to distinct integers.
@@ -3426,8 +3441,6 @@ X #> Y  :- X #>= Y + 1.
 % ```
 
 X #< Y  :- Y #> X.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% #\(+Q)
 %
@@ -3593,8 +3606,6 @@ disjunctive_eqs_vals(A #\/ B) -->
 
 L #\ R :- (L #\/ R) #/\ #\ (L #/\ R).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    A constraint that is being reified need not hold. Therefore, in
    X/Y, Y can as well be 0, for example. Note that it is OK to
@@ -3749,8 +3760,6 @@ parse_init_dcg([V|Vs], P) --> [{init_propagator(V, P)}], parse_init_dcg(Vs, P).
    maplist(portray_clause, Cs).
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 reify(E, B) :- reify(E, B, _).
 
 reify(Expr, B, Ps) :-
@@ -3879,7 +3888,6 @@ relation_tuple_b_prop(Relation, Tuple, B, p(Prop)) :-
                 init_propagator_([B], Prop),
                 do_queue), [Q0], _).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 tuples_in_conjunction(Tuples, Relation, Conj) :-
         maplist(tuple_in_disjunction(Relation), Tuples, Disjs),
@@ -3899,15 +3907,11 @@ fold_statement(Operation, List, Statement) :-
             foldl(Operation, Rest, First, Statement)
         ).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 conjunction(E, Conj, Conj #/\ E).
 
 disjunction(E, Disj, Disj #\/ E).
 
 var_eq(V, N, #V #= N).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Match variables to created skeleton.
 
@@ -3917,8 +3921,6 @@ skeleton(Vs, Vs-Prop) :-
         ;   maplist(prop_init(Prop), Vs),
             trigger_once(Prop)
         ).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    A drep is a user-accessible and visible domain representation. N,
@@ -3995,7 +3997,11 @@ domain(V, Dom) :-
 domains([], _).
 domains([V|Vs], D) :- domain(V, D), domains(Vs, D).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+props_number(fd_props(Gs,Bs,Os), N) :-
+        length(Gs, N1),
+        length(Bs, N2),
+        length(Os, N3),
+        N is N1 + N2 + N3.
 
 fd_get(X, Dom, Ps) :-
         (   get_attr(X, clpz, Attr) -> Attr = clpz_attr(_,_,_,Dom,Ps,_)
@@ -4105,8 +4111,6 @@ largest_finite(n(N), _, n(N)).
 domain_largest_finite(from_to(F,T), L)   :- largest_finite(T, F, L).
 domain_largest_finite(split(_, _, R), L) :- domain_largest_finite(R, L).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    All relevant constraints get a propagation opportunity whenever a
    new constraint is posted.
@@ -4140,8 +4144,6 @@ put_full(X, Dom, Ps) :-
             ;   true
             )
         ).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    A propagator is a term of the form propagator(C, State), where C
@@ -4223,8 +4225,6 @@ propagator_(Propagator) -->
             [clpz:trigger_prop(Propagator)]
         ).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 % DCG variants
 
 kill(State) --> { kill(State) }.
@@ -4263,8 +4263,6 @@ A = B ++> { A = B }.
 A < B ++> { A < B }.
 A is B ++> { A is B }.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 kill(State) :- del_attr(State, clpz_aux), State = dead.
 
 kill(State, Ps) :-
@@ -4285,8 +4283,6 @@ kill_entailed(a(X,Y,B)) :-
         ;   Y == B -> true
         ;   del_attr(B, clpz)
         ).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 no_reactivation(rel_tuple(_,_)).
 no_reactivation(pdistinct(_)).
@@ -4350,8 +4346,6 @@ queue_get_arg_(Queue, Which, Element) :-
 queue_enabled --> state(queue(_,_,_,Aux)), { \+ get_atts(Aux, +disabled) }.
 disable_queue --> state(queue(_,_,_,Aux)), { put_atts(Aux, +disabled) }.
 enable_queue --> state(queue(_,_,_,Aux)), { put_atts(Aux, -disabled) }.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 portray_propagator(propagator(P,_), F) :- functor(P, F, _).
 
@@ -4428,8 +4422,8 @@ lex_chain_(Prop, Ls, Prev, Ls) :-
 lex_le([], []).
 lex_le([V1|V1s], [V2|V2s]) :-
         #V1 #=< #V2,
-        (   integer(V1) ->
-            (   integer(V2) ->
+        (   nonvar(V1), integer(V1) ->
+            (   nonvar(V1), integer(V2) ->
                 (   V1 =:= V2 -> lex_le(V1s, V2s) ;  true )
             ;   freeze(V2, lex_le([V1|V1s], [V2|V2s]))
             )
@@ -4437,6 +4431,7 @@ lex_le([V1|V1s], [V2|V2s]) :-
         ).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 %% tuples_in(+Tuples, +Relation).
 %
@@ -4494,7 +4489,7 @@ tuples_in(Tuples, Relation) :-
 tuples_relation([], _) --> [].
 tuples_relation([Tuple|Tuples], Relation) -->
         { relation_unifiable(Relation, Tuple, Us, _, _) },
-        (   ground(Tuple) -> { memberchk(Tuple, Relation) }
+        (   ground(Tuple) -> { once(member(Tuple, Relation)) }
         ;   tuple_domain(Tuple, Us),
             (   Tuple = [_,_|_] -> tuple_freeze(Tuple, Us)
             ;   []
@@ -4519,7 +4514,7 @@ tuple_domain([T|Ts], Relation0) -->
         tuple_domain(Ts, Relation1).
 
 tuple_freeze(Tuple, Relation) -->
-        (   ground(Tuple) -> { memberchk(Tuple, Relation) }
+        (   ground(Tuple) -> { once(member(Tuple, Relation)) }
         ;   { put_attr(R, clpz_relation, Relation),
               make_propagator(rel_tuple(R, Tuple), Prop) },
             tuple_freeze_(Tuple, Prop)
@@ -4645,7 +4640,7 @@ run_propagator(rel_tuple(R, Tuple), MState) -->
         (   { ground(Tuple) } ->
             kill(MState),
             { del_attr(R, clpz_relation),
-              memberchk(Tuple, Relation) }
+              once(member(Tuple, Relation)) }
         ;   { relation_unifiable(Relation, Tuple, Us, false, Changed),
               Us = [_|_] },
             (   { Tuple = [First,Second], ( ground(First) ; ground(Second) ) } ->
@@ -5163,11 +5158,21 @@ run_propagator(pmod(X,Y,Z), MState) -->
         ;   nonvar(Z), nonvar(X) ->
             (   Z > 0 ->
                 (   X < 0 -> true
-                ;   X >= Z
+                ;   X >= Z,
+                    % due to X = Z+Y*_ and Y > Z
+                    (   X-Z > 0 ->
+                        X-Z > Z
+                    ;   true
+                    )
                 )
             ;   Z < 0 ->
                 (   X > 0 -> true
-                ;   X =< Z
+                ;   X =< Z,
+                    % due to X = Z+Y*_ and Y < Z
+                    (   X-Z < 0 ->
+                        X-Z < Z
+                    ;   true
+                    )
                 )
             ;   Z =:= 0 % Multiple solutions so do nothing special.
             ),
@@ -5175,7 +5180,23 @@ run_propagator(pmod(X,Y,Z), MState) -->
                   YU < X, X =< 0 } -> kill(MState), Z =:= X
             ;   { fd_get(Y, _, n(YL), _, _),
                   YL > X, X >= 0 } -> kill(MState), Z =:= X
-            ;   (   Z > 0 ->
+            ;   (   Z > 0, X < 0 ->
+                    { fd_get(Y, YD, YPs),
+                      YMin is Z+1,
+                      YMax is Z-X,
+                      domain_remove_smaller_than(YD, YMin, YD1),
+                      domain_remove_greater_than(YD1, YMax, YD2) },
+                    fd_put(Y, YD2, YPs)
+                    % queue_goal((Y #> Z, Y #=< Z-X))
+                ;   Z < 0, X > 0 ->
+                    { fd_get(Y, YD, YPs),
+                      YMax is Z-1,
+                      YMin is Z-X,
+                      domain_remove_greater_than(YD, YMax, YD1),
+                      domain_remove_smaller_than(YD1, YMin, YD2) },
+                    fd_put(Y, YD2, YPs)
+                    % queue_goal((Y #< Z, Y #>= Z-X))
+                ;   Z > 0 ->
                     { fd_get(Y, YD, YPs),
                       YMin is Z + 1,
                       domain_remove_smaller_than(YD, YMin, YD1) },
@@ -5187,7 +5208,16 @@ run_propagator(pmod(X,Y,Z), MState) -->
                       domain_remove_greater_than(YD, YMax, YD1) },
                     fd_put(Y, YD1, YPs)
                     % queue_goal(Y #< Z)
-                ;   true
+                ;   Z =:= 0,
+                    (   X =:= 0 ->
+                        kill(MState) % trivial
+                    ;   % only 4 solutions {-abs(X),-1,1,abs(X)}
+                        { YL is -abs(X), YU is abs(X),
+                          fd_get(Y, YD0, YPs),
+                          domain_remove_smaller_than(YD0, YL, YD1),
+                          domain_remove_greater_than(YD1, YU, YD) },
+                        fd_put(Y, YD, YPs)
+                    )
                 )
             )
         ;   run_propagator(pmodz(X,Y,Z), MState),
@@ -5521,7 +5551,6 @@ run_propagator(pmin(X,Y,Z), MState) -->
             )
         ;   []
         ).
-
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% % Z = X ^ Y
 
@@ -5766,7 +5795,7 @@ run_propagator(reified_tuple_in(Tuple, R, B), MState) -->
         (   B == 1 -> kill(MState), { tuples_in([Tuple], Relation) }
         ;   (   ground(Tuple) ->
                 kill(MState),
-                (   { memberchk(Tuple, Relation) } -> B = 1
+                (   { member(Tuple, Relation) } -> B = 1
                 ;   B = 0
                 )
             ;   { relation_unifiable(Relation, Tuple, Us, _, _) },
@@ -6038,6 +6067,7 @@ run_propagator(preified_exp(X, Y, D, R), MState) -->
         ).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 update_bounds(X, XD, XPs, XL, XU, NXL, NXU) -->
         (   NXL == XL, NXU == XU -> []
@@ -6142,7 +6172,6 @@ max_factor(L1, U1, L2, U2, Max) :-
         ).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    J-C. Régin: "A filtering algorithm for constraints of difference in
    CSPs", AAAI-94, Seattle, WA, USA, pp 362--367, 1994
@@ -6185,7 +6214,7 @@ domain_to_list(Domain, List) :- phrase(domain_to_list(Domain), List).
 domain_to_list(split(_, Left, Right)) -->
         domain_to_list(Left), domain_to_list(Right).
 domain_to_list(empty)                 --> [].
-domain_to_list(from_to(n(F),n(T)))    --> { N is T-F+1, length(Ns, N), [F|_] = Ns, chain_(succ, Ns) }, seq(Ns).
+domain_to_list(from_to(n(F),n(T)))    --> { findall(N, between(F, T, N), Ns) }, seq(Ns).
 
 difference_arcs([], []) --> [].
 difference_arcs([V|Vs], FL0) -->
@@ -6198,7 +6227,7 @@ difference_arcs([V|Vs], FL0) -->
 
 writeln(T) :- write(T), nl.
 
-:- meta_predicate must_succeed(0).
+:- meta_predicate(must_succeed(0)).
 
 must_succeed(G) :-
         (   call(G) -> true
@@ -6322,7 +6351,7 @@ put_free(F) :- put_attr(F, free, true).
 
 free_node(F) :- get_attr(F, free, true).
 
-:- meta_predicate with_local_attributes(?, 0, ?).
+:- meta_predicate(with_local_attributes(?, 0, ?)).
 
 :- dynamic(nat_copy/1).
 
@@ -7421,7 +7450,7 @@ a_not_in_b([_,AX,AW,AY,AH], [_,BX,BW,BY,BH]) :-
 % ;  false.
 % ```
 
-automaton(Sigs, Ns, As) :- automaton(_, _, Sigs, Ns, As, [], [], _).
+automaton(Sigs, Ns, As) :- automaton(Sigs, _, Sigs, Ns, As, [], [], _).
 
 
 %% automaton(+Sequence, ?Template, +Signature, +Nodes, +Arcs, +Counters, +Initials, ?Finals)
@@ -7671,8 +7700,6 @@ zcompare__(=, A, B) :- #A #= #B.
 zcompare__(<, A, B) :- #A #< #B.
 zcompare__(>, A, B) :- #A #> #B.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 %% chain(+Relation, +Zs)
 %
 % Zs form a chain with respect to Relation. Zs is a list of finite
@@ -7707,7 +7734,6 @@ chain_relation(#>=).
 chain(Relation, X, Prev, X) :- call(Relation, #Prev, #X).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Reflection predicates
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -7792,8 +7818,6 @@ fd_dom(X, Drep) :-
             Drep = X..X
         ).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Entailment detection. Subject to change.
 
@@ -7821,8 +7845,6 @@ goals_entail(Goals, E) :-
                term_variables(Goals-E, Vs),
                label(Vs)
            ).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Unification hook and constraint projection
@@ -7922,7 +7944,7 @@ unwrap_with(G_2, T0, T) :-
         T =.. [N|As]
     ).
 
-bare_integer(V0, V)    :- ( integer(V0) -> V = V0 ; V = #V0 ).
+bare_integer(V0, V)    :- ( nonvar(V0), integer(V0) -> V = V0 ; V = #V0 ).
 
 attribute_goal_(presidual(Goal))       --> [Goal].
 attribute_goal_(pgeq(A,B))             --> [#A #>= #B].
@@ -8016,8 +8038,6 @@ original_goal(original_goal(State, Goal)) -->
         ;   []
         ).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Projection of scalar product.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -8056,8 +8076,6 @@ plusterm_(CV, T0, T0+T) :- coeff_var_term(CV, T).
 
 coeff_var_term(C-V, T) :- ( C =:= 1 -> T = #V ; T = C * #V ).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Reified predicates for use with predicates from library(reif).
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -8072,8 +8090,6 @@ clpz_t(Expr, T) :-
 
 zo_t(0, false).
 zo_t(1, true).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Generated predicates
@@ -8143,3 +8159,4 @@ term_expansion(make_matches, Ts0, Ts)       :- make_matches(Cs0), cutless(Cs0, C
 make_parse_clpz.
 make_parse_reified.
 make_matches.
+?- true.

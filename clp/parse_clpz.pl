@@ -5,21 +5,28 @@
    example, in X/Y and X mod Y, Y is constrained to be #\= 0.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-constrain_to_integer(Var) :-
-        (   integer(Var) -> true
-        ;   fd_get(Var, D, Ps),
-            fd_put(Var, D, Ps)
-        ).
+constrain_to_integer(X) :-
+    (   var(X)
+    ->  fd_get(X, D, Ps),
+        fd_put(X, D, Ps)
+    ;   integer(X)
+    ).
 
 power_var_num(P, X, N) :-
-        (   var(P) -> X = P, N = 1
-        ;   P = Left*Right,
-            power_var_num(Left, XL, L),
-            power_var_num(Right, XR, R),
-            XL == XR,
-            X = XL,
-            N is L + R
-        ).
+    (   var(P)
+    ->  X = P,
+        N = 1
+    ;   P = #Q
+    ->  must_be_fd_integer(Q),
+        X = Q,
+        N = 1
+    ;   P = Left*Right,
+        power_var_num(Left, XL, L),
+        power_var_num(Right, XR, R),
+        XL == XR,
+        X = XL,
+        integer_add(L, R, N)
+    ).
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Given expression E, we obtain the finite domain variable R by
@@ -27,7 +34,7 @@ power_var_num(P, X, N) :-
    conditions and bodies. In conditions, g(Goal) means literally Goal,
    and m(Match) means that E can be decomposed as stated. The
    variables are to be understood as the result of parsing the
-   subexpressions recursively. In the body, g(Goal) means again Goal,
+   subexpressions recursively. In the body, g(Goal) means again Goal
    and p(Propagator) means to attach and trigger once a propagator.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
@@ -38,60 +45,60 @@ parse_clpz(E, R,
              g(integer(E))     => [g(R = E)],
              ?(E)              => [g(must_be_fd_integer(E)), g(R = E)],
              #E                => [g(must_be_fd_integer(E)), g(R = E)],
-             m(A+B)            => [p(pplus(A, B, R))],
+             m(A+B)            => [p(iadd(A,B,R))],
              % power_var_num/3 must occur before */2 to be useful
-             g(power_var_num(E, V, N)) => [p(pexp(V, N, R))],
-             m(A*B)            => [p(ptimes(A, B, R))],
-             m(A-B)            => [p(pplus(R,B,A))],
-             m(-A)             => [p(pplus(A,R,0))],
-             m(max(A,B))       => [g(A #=< #R), g(B #=< R), p(pmax(A, B, R))],
-             m(min(A,B))       => [g(A #>= #R), g(B #>= R), p(pmin(A, B, R))],
-             m(A mod B)        => [g(B #\= 0), p(pmod(A, B, R))],
-             m(A rem B)        => [g(B #\= 0), p(prem(A, B, R))],
-             m(abs(A))         => [g(#R #>= 0), p(pabs(A, R))],
-             m(A/B)            => [g(B #\= 0), p(ptimes(R, B, A))],
-             m(A//B)           => [g(B #\= 0), p(ptzdiv(A, B, R))],
+             % g(power_var_num(E, V, N)) => [p(iexp(V,N,R))],
+             m(A*B)            => [p(imul(A, B, R))],
+             m(A-B)            => [p(iadd(R,B,A))],
+             m(-A)             => [p(iadd(A,R,0))],
+             m(max(A,B))       => [g(A #=< #R), g(B #=< R), p(imax(A,B,R))],
+             m(min(A,B))       => [g(A #>= #R), g(B #>= R), p(imin(A,B,R))],
+             m(A mod B)        => [g(B #\= 0), p(imod(A,B,R))],
+             m(A rem B)        => [g(B #\= 0), p(prem(A,B,R))],
+             m(abs(A))         => [g(#R #>= 0), p(iabs(A,R))],
+             m(A/B)            => [g(B #\= 0), p(imul(R,B,A))],
+             m(A//B)           => [g(B #\= 0), p(ptzdiv(A,B,R))],
              m(A div B)        => [g(#R #= (A - (A mod B)) // B)],
-             m(A^B)            => [p(pexp(A, B, R))],
-             m(sign(A))        => [g(R in -1..1), p(psign(A, R))],
+             m(A^B)            => [p(iexp(A, B, R))],
+             m(sign(A))        => [g(R in -1..1), p(isgn(A,R))],
              % bitwise operations
-             m(\A)             => [p(pfunction(\, A, R))],
-             m(msb(A))         => [p(pfunction(msb, A, R))],
-             m(lsb(A))         => [p(pfunction(lsb, A, R))],
-             m(popcount(A))    => [p(pfunction(popcount, A, R))],
-             m(A<<B)           => [p(pfunction(<<, A, B, R))],
-             m(A>>B)           => [p(pfunction(>>, A, B, R))],
-             m(A/\B)           => [p(pfunction(/\, A, B, R))],
-             m(A\/B)           => [p(pfunction(\/, A, B, R))],
-             m(xor(A, B))      => [p(pxor(A, B, R))],
+             m(\A)             => [p(pfunction(\,A,R))],
+             m(msb(A))         => [p(pfunction(msb,A,R))],
+             m(lsb(A))         => [p(pfunction(lsb,A,R))],
+             m(popcount(A))    => [p(pfunction(popcount,A,R))],
+             m(A<<B)           => [p(pfunction(<<,A,B,R))],
+             m(A>>B)           => [p(pfunction(>>,A,B,R))],
+             m(A/\B)           => [p(pfunction(/\,A,B,R))],
+             m(A\/B)           => [p(pfunction(\/,A,B,R))],
+             m(xor(A, B))      => [p(ixor(A,B,R))],
              g(true)           => [g(domain_error(clpz_expression, E))]
             ]).
 
 non_monotonic(X) :-
-        (   \+ fd_var(X), monotonic ->
-            instantiation_error(X)
-        ;   true
-        ).
+    (   \+ fd_var(X),
+        monotonic
+    ->
+        instantiation_error(X)
+    ;   true
+    ).
 
 % Here, we compile the committed choice language to a single
 % predicate, parse_clpz/2.
 
 make_parse_clpz(Clauses) :-
         parse_clpz_clauses(Clauses0),
-        maplist(goals_goal, Clauses0, Clauses).
+        list_map(goals_goal, Clauses0, Clauses).
 
 goals_goal((Head :- Goals), (Head :- Body)) :-
-        list_goal(Goals, Body).
+        goals_goal(',', Goals, Body).
 
 parse_clpz_clauses(Clauses) :-
         parse_clpz(E, R, Matchers),
-        maplist(parse_matcher(E, R), Matchers, Clauses).
+        list_map(parse_matcher(E, R), Matchers, Clauses).
 
-parse_matcher(E, R, Matcher, Clause) :-
-        Matcher = (Condition0 => Goals0),
-        phrase((parse_condition(Condition0, E, Head),
-                parse_goals(Goals0)), Goals),
-        Clause = (parse_clpz(Head, R) :- Goals).
+parse_matcher(E, R, Condition0 => Goals0, Clause) :-
+    phrase((parse_condition(Condition0, E, Head), parse_goals(Goals0)), Goals),
+    Clause = (parse_clpz(Head, R) :- Goals).
 
 parse_condition(g(Goal), E, E)       --> [Goal, !].
 parse_condition(?(E), _, ?(E))       --> [!].
@@ -113,113 +120,48 @@ parse_goals([]) --> [].
 parse_goals([G|Gs]) --> parse_goal(G), parse_goals(Gs).
 
 parse_goal(g(Goal)) --> [Goal].
-parse_goal(p(Prop)) -->
-        { term_variables(Prop, Vs) },
-        [make_propagator(Prop, P),
-         new_queue(Q0),
-         phrase(init_propagator_(Vs, P), [Q0], [Q]),
-         variables_same_queue(Vs),
-         trigger_once_(P, Q)].
+parse_goal(p(C)) -->
+    { term_variables(C, Vs) },
+    [propagator_from_constraint(C, P),propagator_trigger(P, Vs)].
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ?- use_module(library(lists)),
    use_module(library(format)),
    clpz:parse_clpz_clauses(Clauses),
-   maplist(portray_clause, Clauses).
+   list_map(portray_clause, Clauses).
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-trigger_once(Prop) :-
-        new_queue(Q),
-        trigger_once_(Prop, Q).
 
-trigger_once_(Prop, Q) :-
-        phrase((trigger_prop(Prop),do_queue), [Q], _).
-
-neq(A, B) :- propagator_init_trigger(pneq(A, B)).
-
-propagator_init_trigger(P) -->
-        { term_variables(P, Vs) },
-        propagator_init_trigger(Vs, P).
-
-propagator_init_trigger(Vs, P) -->
-        [p(Prop)],
-        { make_propagator(P, Prop),
-          new_queue(Q0),
-          phrase(init_propagator_(Vs, Prop), [Q0], [Q]),
-          variables_same_queue(Vs),
-          trigger_once_(Prop, Q) }.
-
-variables_same_queue(Vs0) :-
-        include(var, Vs0, Vs),
-        (   Vs == [] -> true
-        ;   maplist(variable_queue, Vs, Qs0),
-            sort(Qs0, [Q|Qs]),
-            Q =.. [_|Args],
-            append_queues_(Qs, Args, [append,append,append,ignore]),
-            maplist(clear_queue, Qs),
-            maplist(=(Q), Qs)
-        ).
-
-append_queues_([], _, _).
-append_queues_([Q|Qs], Args0, Is) :-
-        Q =.. [_|Args],
-        maplist(append_queue, Is, Args0, Args),
-        append_queues_(Qs, Args, Is).
-
-append_queue(ignore, _, _).
-append_queue(append, Q0, Q) :-
-        (   get_atts(Q0, +queue(Ls0,Ls)) ->
-            (   get_atts(Q, +queue(Ms0,Ms)) ->
-                Ls = Ms0,
-                put_atts(Q0, +queue(Ls0,Ms))
-            ;   true
-            )
-        ;   (   get_atts(Q, +queue(Ms0,Ms)) ->
-                put_atts(Q0, +queue(Ms0,Ms))
-            ;   true
-            )
-        ).
-
-clear_queue(queue(Goals,Fast,Slow,Aux)) :-
-        put_atts(Goals, -queue(_,_)),
-        put_atts(Fast, -queue(_,_)),
-        put_atts(Slow, -queue(_,_)),
-        put_atts(Aux, -disabled).
-
-variable_queue(Var, Q) :-
-        get_attr(Var, clpz, Attr),
-        Attr = clpz_attr(_Left,_Right,_Spread,_Dom,_Ps,Q).
-
-propagator_init_trigger(P) :-
-        phrase(propagator_init_trigger(P), _).
-
-propagator_init_trigger(Vs, P) :-
-        phrase(propagator_init_trigger(Vs, P), _).
-
-prop_init(Prop, V) :- init_propagator(V, Prop).
+neq(A, B) :-
+    propagator_from_constraint(pneq(A,B), P),
+    term_variables([A,B], Vs),
+    propagator_trigger(P, Vs).
 
 geq(A, B) :-
-        new_queue(Q),
-        phrase((geq(A, B),do_queue), [Q], _).
+        queue_empty(Q),
+        phrase((geq(A, B),propagator_catalyze), [Q], _).
 
 geq(A, B) -->
         (   { fd_get(A, AD, APs) } ->
             { domain_infimum(AD, AI) },
             (   { fd_get(B, BD, _) } ->
                 { domain_supremum(BD, BS) },
-                (   { AI cis_geq BS } -> true
-                ;   { propagator_init_trigger(pgeq(A,B)) }
+                (   { AI cis_ge BS } -> true
+                ;   {   propagator_from_constraint(pleq(B,A), P),
+                        term_variables([A,B], Vs),
+                        propagator_trigger(P, Vs)
+                    }
                 )
-            ;   (   { AI cis_geq n(B) } -> true
-                ;   { domain_remove_smaller_than(AD, B, AD1) },
+            ;   (   { AI cis_ge n(B) } -> true
+                ;   { domain_remove_less_than(B, AD, AD1) },
                     fd_put(A, AD1, APs)
                 )
             )
         ;   { fd_get(B, BD, BPs) } ->
-            { domain_remove_greater_than(BD, A, BD1) },
+            { domain_remove_greater_than(A, BD, BD1) },
             fd_put(B, BD1, BPs)
         ;   A >= B
         ).
@@ -257,62 +199,89 @@ symmetric(#=).
 symmetric(#\=).
 
 matches([
-         m_c(any(X) #>= any(Y), left_right_linsum_const(X, Y, Cs, Vs, Const)) =>
-            [g((   Cs = [1], Vs = [A] -> geq(A, Const)
-               ;   Cs = [-1], Vs = [A] -> Const1 is -Const, geq(Const1, A)
-               ;   Cs = [1,1], Vs = [A,B] -> #A + #B #= #S, geq(S, Const)
-               ;   Cs = [1,-1], Vs = [A,B] ->
-                   (   Const =:= 0 -> geq(A, B)
-                   ;   C1 is -Const,
-                       propagator_init_trigger(x_leq_y_plus_c(B, A, C1))
-                   )
-               ;   Cs = [-1,1], Vs = [A,B] ->
-                   (   Const =:= 0 -> geq(B, A)
-                   ;   C1 is -Const,
-                       propagator_init_trigger(x_leq_y_plus_c(A, B, C1))
-                   )
-               ;   Cs = [-1,-1], Vs = [A,B] ->
-                   #A + #B #= #S, Const1 is -Const, geq(Const1, S)
-               ;   scalar_product_(#>=, Cs, Vs, Const)
-               ))],
-         m(any(X) - any(Y) #>= integer(C))     => [d(X, X1), d(Y, Y1), g(C1 is -C), p(x_leq_y_plus_c(Y1, X1, C1))],
-         m(integer(X) #>= any(Z) + integer(A)) => [g(C is X - A), r(C, Z)],
-         m(abs(any(X)-any(Y)) #>= any(Z))  =>
-           [d(X, X1), d(Y, Y1), d(Z, Z1), g((abs(#A)#= #B,Y1+A#=X1,Z1#=<B))],
-         m(abs(any(X)) #>= integer(I))         => [d(X, RX), g((I>0 -> I1 is -I, RX in inf..I1 \/ I..sup; true))],
-         m(integer(I) #>= abs(any(X)))         => [d(X, RX), g(I>=0), g(I1 is -I), g(RX in I1..I)],
-         m(any(X) #>= any(Y))                  => [d(X, RX), d(Y, RY), g(geq(RX, RY))],
+    m_c(any(X) #>= any(Y), left_right_linsum_const(X, Y, Cs, Vs, Const)) =>
+       [g((   Cs = [1], Vs = [A] -> geq(A, Const)
+          ;   Cs = [-1], Vs = [A] -> integer_neg(Const, Const1), geq(Const1, A)
+          ;   Cs = [1,1], Vs = [A,B] -> #A + #B #= #S, geq(S, Const)
+          ;   Cs = [1,-1], Vs = [A,B] ->
+              (   Const =:= 0 -> geq(A, B)
+              ;   integer_neg(Const, C1),
+                  propagator_from_constraint(x_leq_y_plus_c(B,A,C1), P),
+                  term_variables([B,A,C1], Ws),
+                  propagator_trigger(P, Ws)
+              )
+          ;   Cs = [-1,1], Vs = [A,B] ->
+              (   Const =:= 0 -> geq(B, A)
+              ;   integer_neg(Const, C1),
+                  propagator_from_constraint(x_leq_y_plus_c(A,B,C1), P),
+                  term_variables([B,A,C1], Ws),
+                  propagator_trigger(P, Ws)
+              )
+          ;   Cs = [-1,-1], Vs = [A,B] ->
+              #A + #B #= #S, integer_neg(Const, Const1), geq(Const1, S)
+          ;   '@scalar_product'(#>=, Cs, Vs, Const)
+          ))],
+    m(any(X) - any(Y) #>= integer(C))   =>
+        [d(X, X1), d(Y, Y1), g(C1 is -C), p(x_leq_y_plus_c(Y1, X1, C1))],
+    m(integer(X) #>= any(Z) + integer(A)) =>
+        [g(C is X - A), r(C, Z)],
+    m(abs(any(X)-any(Y)) #>= any(Z))    =>
+        [d(X, X1), d(Y, Y1), d(Z, Z1), g((abs(#A)#= #B,Y1+A#=X1,Z1#=<B))],
+    m(abs(any(X)) #>= integer(I))       =>
+        [d(X, RX), g((I>0 -> I1 is -I, RX in inf..I1 \/ I..sup; true))],
+    m(integer(I) #>= abs(any(X)))       =>
+        [d(X, RX), g(I>=0), g(I1 is -I), g(RX in I1..I)],
+    m(any(X) #>= any(Y))                =>
+        [d(X, RX), d(Y, RY), g(geq(RX, RY))],
 
-         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-         m(var(X) #= var(Y))        => [g(constrain_to_integer(X)), g(X=Y)],
-         m(var(X) #= var(Y)+var(Z)) => [p(pplus(Y,Z,X))],
-         m(var(X) #= var(Y)-var(Z)) => [p(pplus(X,Z,Y))],
-         m(var(X) #= var(Y)*var(Z)) => [p(ptimes(Y,Z,X))],
-         m(var(X) #= -var(Y))       => [p(pplus(X,Y,0))],
-         m_c(any(X) #= any(Y), left_right_linsum_const(X, Y, Cs, Vs, S)) =>
-            [g(scalar_product_(#=, Cs, Vs, S))],
-         m_c(var(X) #= abs(var(Y)) + any(V0), X == Y) => [d(V0,V),p(x_eq_abs_plus_v(X,V))],
-         m_c(var(X) #= abs(var(Y)) - any(V0), X == Y) => [d(-V0,V),p(x_eq_abs_plus_v(X,V))],
-         m(var(X) #= any(Y))       => [d(Y,X)],
-         m(any(X) #= any(Y))       => [d(X, RX), d(Y, RX)],
+    m(var(X) #= var(Y))         =>
+        [g(constrain_to_integer(X)), g(X=Y)],
+    m(var(X) #= var(Y)+var(Z))  =>
+        [p(iadd(Y,Z,X))],
+    m(var(X) #= var(Y)-var(Z))  =>
+        [p(iadd(X,Z,Y))],
+    m(var(X) #= var(Y)*var(Z))  =>
+        [p(imul(Y,Z,X))],
+    m(var(X) #= -var(Y))        =>
+        [p(iadd(X,Y,0))],
+    m_c(any(X) #= any(Y), left_right_linsum_const(X, Y, Cs, Vs, S)) =>
+       [g('@scalar_product'(#=, Cs, Vs, S))],
+    m_c(var(X) #= abs(var(Y))+any(V0), X == Y) =>
+        [d(V0,V),p(x_eq_abs_plus_v(X,V))],
+    m_c(var(X) #= abs(var(Y))-any(V0), X == Y) =>
+        [d(-V0,V),p(x_eq_abs_plus_v(X,V))],
+    m(var(X) #= any(Y))         =>
+        [d(Y,X)],
+    m(any(X) #= any(Y))         =>
+        [d(X, RX), d(Y, RX)],
 
-         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-         m(var(X) #\= integer(Y))             => [g(neq_num(X, Y))],
-         m(var(X) #\= var(Y))                 => [p(pneq(X,Y))],
-         m(var(X) #\= var(Y) + var(Z))        => [p(x_neq_y_plus_z(X, Y, Z))],
-         m(var(X) #\= var(Y) - var(Z))        => [p(x_neq_y_plus_z(Y, X, Z))],
-         m(var(X) #\= var(Y)*var(Z))          => [p(ptimes(Y,Z,P)), g(neq(X,P))],
-         m(integer(X) #\= abs(any(Y)-any(Z))) => [d(Y, Y1), d(Z, Z1), p(absdiff_neq(Y1, Z1, X))],
-         m_c(any(X) #\= any(Y), left_right_linsum_const(X, Y, Cs, Vs, S)) =>
-            [g(scalar_product_(#\=, Cs, Vs, S))],
-         m(any(X) #\= any(Y) + any(Z))        => [d(X, X1), d(Y, Y1), d(Z, Z1), p(x_neq_y_plus_z(X1, Y1, Z1))],
-         m(any(X) #\= any(Y) - any(Z))        => [d(X, X1), d(Y, Y1), d(Z, Z1), p(x_neq_y_plus_z(Y1, X1, Z1))],
-         m(any(X) #\= any(Y)) => [d(X, RX), d(Y, RY), g(neq(RX, RY))]
-        ]).
+    m(var(X) #\= integer(Y))            =>
+        [g(neq_num(X, Y))],
+    m(var(X) #\= var(Y))                =>
+        [p(pneq(X,Y))],
+    m(var(X) #\= var(Y) + var(Z))       =>
+        [p(x_neq_y_plus_z(X, Y, Z))],
+    m(var(X) #\= var(Y) - var(Z))       =>
+        [p(x_neq_y_plus_z(Y, X, Z))],
+    m(var(X) #\= var(Y)*var(Z))         =>
+        [p(imul(Y,Z,P)), g(neq(X,P))],
+    m(integer(X) #\= abs(any(Y)-any(Z))) =>
+        [d(Y, Y1), d(Z, Z1), p(absdiff_neq(Y1, Z1, X))],
+    m_c(any(X) #\= any(Y), left_right_linsum_const(X, Y, Cs, Vs, S)) =>
+        [g('@scalar_product'(#\=, Cs, Vs, S))],
+    m(any(X) #\= any(Y) + any(Z))       =>
+        [d(X, X1), d(Y, Y1), d(Z, Z1), p(x_neq_y_plus_z(X1, Y1, Z1))],
+    m(any(X) #\= any(Y) - any(Z))       =>
+        [d(X, X1), d(Y, Y1), d(Z, Z1), p(x_neq_y_plus_z(Y1, X1, Z1))],
+    m(any(X) #\= any(Y))                =>
+        [d(X, RX), d(Y, RY), g(neq(RX, RY))]
+]).
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    We again compile the committed-choice matching language to the
@@ -324,10 +293,10 @@ make_matches(Clauses) :-
         matches(Ms),
         findall(F, (member(M=>_, Ms), arg(1, M, M1), functor(M1, F, _)), Fs0),
         sort(Fs0, Fs),
-        maplist(prevent_cyclic_argument, Fs, PrevCyclicClauses),
-        phrase(matchers(Ms), Clauses0),
-        maplist(goals_goal, Clauses0, MatcherClauses),
-        append(PrevCyclicClauses, MatcherClauses, Clauses1),
+        list_map(prevent_cyclic_argument, Fs, PrevCyclicClauses),
+        phrase(map('@matcher', Ms), Clauses0),
+        list_map(goals_goal, Clauses0, MatcherClauses),
+        list_append(PrevCyclicClauses, MatcherClauses, Clauses1),
         sort_by_predicate(Clauses1, Clauses).
 
 sort_by_predicate(Clauses, ByPred) :-
@@ -347,37 +316,41 @@ predname(T, Key) :-
 prevent_cyclic_argument(F0, Clause) :-
         match_expand(F0, F),
         Head =.. [F,X,Y],
-        Clause = (Head :- (   cyclic_term(X) ->
-                              domain_error(clpz_expression, X)
-                          ;   cyclic_term(Y) ->
-                              domain_error(clpz_expression, Y)
-                          ;   false
-                          )).
+        Clause = (
+            Head :-
+                (   cyclic_term(X)
+                ->  domain_error(clpz_expression, X)
+                ;   cyclic_term(Y)
+                ->  domain_error(clpz_expression, Y)
+                ;   false
+                )
+        ).
 
-matchers([]) --> [].
-matchers([Condition => Goals|Ms]) -->
-        matcher(Condition, Goals),
-        matchers(Ms).
+'@matcher'(Condition => Goals) -->
+    matcher(Condition, Goals).
 
 matcher(m(M), Gs) --> matcher(m_c(M,true), Gs).
 matcher(m_c(Matcher,Cond), Gs) -->
-        [(Head :- Goals0)],
-        { Matcher =.. [F,A,B],
-          match_expand(F, Expand),
-          Head =.. [Expand,X,Y],
-          phrase((match(A, X), match(B, Y)), Goals0, [Cond,!|Goals1]),
-          phrase(match_goals(Gs, Expand), Goals1) },
-        (   { symmetric(F), \+ (subsumes_term(A, B), subsumes_term(B, A)) } ->
-            { Head1 =.. [Expand,Y,X] },
-            [(Head1 :- Goals0)]
-        ;   []
-        ).
+    [(Head0 :- Goals0)],
+    { Matcher =.. [F,A,B],
+      match_expand(F, Expand),
+      Head0 =.. [Expand,X,Y],
+      phrase((match(A, X), match(B, Y)), Goals0, [Cond,!|Goals1]),
+      phrase(map(match_goal(Expand), Gs), Goals1) },
+    (   { symmetric(F), \+ (subsumes_term(A, B), subsumes_term(B, A)) }
+    ->  { Head1 =.. [Expand,Y,X] },
+        [(Head1 :- Goals0)]
+    ;   []
+    ).
 
 match(any(A), T)     --> [A = T].
-match(var(V), T)     --> [( nonvar(T), ( T = ?(Var) ; T = #Var ) ->
-                            must_be_fd_integer(Var), V = Var
-                          ; v_or_i(T), V = T
-                          )].
+match(var(V), T)     -->
+    [(  nonvar(T), ( T = ?(Var) ; T = #Var )
+    ->  must_be_fd_integer(Var),
+        V = Var
+    ;   v_or_i(T),
+        V = T
+    )].
 match(integer(I), T) --> [integer(T), I = T].
 match(-X, T)         --> [nonvar(T), T = -A], match(X, A).
 match(abs(X), T)     --> [nonvar(T), T = abs(A)], match(X, A).
@@ -385,16 +358,9 @@ match(X+Y, T)        --> [nonvar(T), T = A + B], match(X, A), match(Y, B).
 match(X-Y, T)        --> [nonvar(T), T = A - B], match(X, A), match(Y, B).
 match(X*Y, T)        --> [nonvar(T), T = A * B], match(X, A), match(Y, B).
 
-match_goals([], _)     --> [].
-match_goals([G|Gs], F) --> match_goal(G, F), match_goals(Gs, F).
-
-match_goal(r(X,Y), F)  --> { G =.. [F,X,Y] }, [G].
-match_goal(d(X,Y), _)  --> [parse_clpz(X, Y)].
-match_goal(g(Goal), _) --> [Goal].
-match_goal(p(Prop), _) -->
-        { term_variables(Prop, Vs) },
-        [make_propagator(Prop, P),
-         new_queue(Q0),
-         phrase(init_propagator_(Vs, P), [Q0], [Q]),
-         variables_same_queue(Vs),
-         trigger_once_(P, Q)].
+match_goal(F, r(X,Y))  --> { G =.. [F,X,Y] }, [G].
+match_goal(_, d(X,Y))  --> [parse_clpz(X, Y)].
+match_goal(_, g(Goal)) --> [Goal].
+match_goal(_, p(C)) -->
+    { term_variables(C, Vs) },
+    [propagator_from_constraint(C, P), propagator_trigger(P, Vs)].

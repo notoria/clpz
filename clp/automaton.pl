@@ -17,14 +17,14 @@
 %  Example query:
 %
 % ```
-% ?- length(Vs, 3), two_consecutive_ones(Vs), label(Vs).
+% ?- list_length(Vs, 3), two_consecutive_ones(Vs), label(Vs).
 %    Vs = [0,1,1]
 % ;  Vs = [1,1,0]
 % ;  Vs = [1,1,1]
 % ;  false.
 % ```
 
-automaton(Sigs, Ns, As) :- automaton(_, _, Sigs, Ns, As, [], [], _).
+automaton(Sigs, Ns, As) :- automaton(Sigs, _, Sigs, Ns, As, [], [], _).
 
 
 %% automaton(+Sequence, ?Template, +Signature, +Nodes, +Arcs, +Counters, +Initials, ?Finals)
@@ -87,7 +87,7 @@ automaton(Sigs, Ns, As) :- automaton(_, _, Sigs, Ns, As, [], [], _).
 %  ?- sequence_inflexions([1,2,3,3,2,1,3,0], N).
 %  N = 3.
 %
-%  ?- length(Ls, 5), Ls ins 0..1,
+%  ?- list_length(Ls, 5), Ls ins 0..1,
 %     sequence_inflexions(Ls, 3), label(Ls).
 %  Ls = [0, 1, 0, 1, 0] ;
 %  Ls = [1, 0, 1, 0, 1].
@@ -110,33 +110,40 @@ initial_expr(_, []-1).
 
 automaton(Seqs, Template, Sigs, Ns, As0, Cs, Is, Fs) :-
         must_be(list(list), [Sigs,Ns,As0,Cs,Is]),
-        (   var(Seqs) ->
-            (   monotonic ->
-                instantiation_error(Seqs)
+        (   var(Seqs)
+        ->  (   monotonic
+            ->  instantiation_error(Seqs)
             ;   Seqs = Sigs
             )
         ;   must_be(list, Seqs)
         ),
-        maplist(monotonic, Cs, CsM),
-        maplist(arc_normalized(CsM), As0, As),
+        list_map(monotonic, Cs, CsM),
+        list_map(arc_normalized(CsM), As0, As),
         include_args1(sink, Ns, Sinks),
         include_args1(source, Ns, Sources),
-        maplist(initial_expr, Cs, Exprs0),
-        phrase((arcs_relation(As, Relation),
+        list_map(initial_expr, Cs, Exprs0),
+        phrase(
+            (   arcs_relation(As, Relation),
                 nodes_nums(Sinks, SinkNums0),
-                nodes_nums(Sources, SourceNums0)),
-               [s([]-0, Exprs0)], [s(_,Exprs1)]),
-        maplist(expr0_expr, Exprs1, Exprs),
-        phrase(transitions(Seqs, Template, Sigs, Start, End, Exprs, Cs, Is, Fs), Tuples),
-        list_to_drep(SourceNums0, SourceDrep),
+                nodes_nums(Sources, SourceNums0)
+            ),
+            [s([]-0, Exprs0)],
+            [s(_,Exprs1)]
+        ),
+        list_map(expr0_expr, Exprs1, Exprs),
+        phrase(
+            transitions(Seqs, Template, Sigs, Start, End, Exprs, Cs, Is, Fs),
+            Tuples
+        ),
+        drep_from_numbers(SourceNums0, SourceDrep),
         Start in SourceDrep,
-        list_to_drep(SinkNums0, SinkDrep),
+        drep_from_numbers(SinkNums0, SinkDrep),
         End in SinkDrep,
         tuples_in(Tuples, Relation).
 
 expr0_expr(Es0-_, Es) :-
         pairs_keys(Es0, Es1),
-        reverse(Es1, Es).
+        list_reversed(Es1, Es).
 
 transitions([], _, [], S, S, _, _, Cs, Cs) --> [].
 transitions([Seq|Seqs], Template, [Sig|Sigs], S0, S, Exprs, Counters, Cs0, Cs) -->
@@ -199,7 +206,7 @@ node_num(Node, Num) -->
 
 include_args1(Goal, Ls0, As) :-
         include(Goal, Ls0, Ls),
-        maplist(arg(1), Ls, As).
+        list_map(arg(1), Ls, As).
 
 source(source(_)).
 

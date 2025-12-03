@@ -33,33 +33,41 @@ global_cardinality(Xs, Pairs) :- global_cardinality(Xs, Pairs, []).
 %  associated cost is Matrix\_{ij}. Cost is the sum of all costs.
 
 global_cardinality(Xs, Pairs, Options) :-
-        must_be(list(list), [Xs,Pairs,Options]),
-        maplist(fd_variable, Xs),
-        maplist(gcc_pair, Pairs),
-        pairs_keys_values(Pairs, Keys, Nums),
-        (   sort(Keys, Keys1), same_length(Keys, Keys1) -> true
-        ;   domain_error(gcc_unique_key_pairs, Pairs)
-        ),
-        length(Xs, L),
-        Nums ins 0..L,
-        list_to_drep(Keys, Drep),
-        Xs ins Drep,
-        gcc_pairs(Pairs, Xs, Pairs1),
-        % pgcc_check must be installed before triggering other
-        % propagators
-        propagator_init_trigger(Xs, pgcc_check(Pairs1)),
-        propagator_init_trigger(Nums, pgcc_check_single(Pairs1)),
-        (   member(OD, Options), OD == consistency(value) -> true
-        ;   propagator_init_trigger(Nums, pgcc_single(Xs, Pairs1)),
-            propagator_init_trigger(Xs, pgcc(Xs, Pairs, Pairs1))
-        ),
-        (   member(OC, Options), functor(OC, cost, 2) ->
-            OC = cost(Cost, Matrix),
-            must_be(list(list(integer)), Matrix),
-            maplist(keys_costs(Keys), Xs, Matrix, Costs),
-            sum(Costs, #=, Cost)
-        ;   true
-        ).
+    must_be(list(list), [Xs,Pairs,Options]),
+    list_map(fd_variable, Xs),
+    list_map(gcc_pair, Pairs),
+    pairs_keys_values(Pairs, Keys, Nums),
+    (   sort(Keys, Keys1), list_equisized(Keys, Keys1) -> true
+    ;   domain_error(gcc_unique_key_pairs, Pairs)
+    ),
+    list_length(Xs, L),
+    Nums ins 0..L,
+    drep_from_numbers(Keys, Drep),
+    Xs ins Drep,
+    gcc_pairs(Pairs, Xs, Pairs1),
+    % pgcc_check must be installed before triggering other
+    % propagators
+    % constraint_trigger(Xs, pgcc_check(Pairs1)),
+    propagator_from_constraint(pgcc_check(Pairs1), P0),
+    propagator_trigger(P0, Xs),
+    % constraint_trigger(Nums, pgcc_check_single(Pairs1)),
+    propagator_from_constraint(pgcc_check_single(Pairs1), P1),
+    propagator_trigger(P1, Nums),
+    (   member(OD, Options), OD == consistency(value) -> true
+    ;   % constraint_trigger(Nums, pgcc_single(Xs, Pairs1)),
+        propagator_from_constraint(pgcc_single(Xs,Pairs1), P2),
+        propagator_trigger(P2, Nums),
+        % constraint_trigger(Xs, pgcc(Xs, Pairs, Pairs1))
+        propagator_from_constraint(pgcc(Xs,Pairs,Pairs1), P3),
+        propagator_trigger(P3, Xs)
+    ),
+    (   member(OC, Options), functor(OC, cost, 2) ->
+        OC = cost(Cost, Matrix),
+        must_be(list(list(integer)), Matrix),
+        list_map(keys_costs(Keys), Xs, Matrix, Costs),
+        sum(Costs, #=, Cost)
+    ;   true
+    ).
 
 keys_costs(Keys, X, Row, C) :-
         element(N, Keys, X),
@@ -99,7 +107,7 @@ gcc_global(Vs, KNs) -->
         % variables, which a previously scheduled and called
         % gcc_check//1 ensures. Note that gcc_check//1 disables the
         % queue and accumulates constraints in the queue. Do we need
-        % to insert a call of do_queue//0 here to reach a fixpoint?  I
+        % to insert a call of propagator_catalyze//0 here to reach a fixpoint?  I
         % think not, because verify_attributes/3 gives each variable
         % that is involved in a unification an opportunity to schedule
         % its propagators, even if the unifications happen
@@ -110,7 +118,7 @@ gcc_global(Vs, KNs) -->
         { with_local_attributes(Vs,
               (gcc_arcs(KNs, S, Vals),
                variables_with_num_occurrences(Vs, VNs),
-               maplist(target_to_v(T), VNs),
+               list_map(target_to_v(T), VNs),
                (   get_attr(S, edges, Es) ->
                    put_attr(S, parent, none), % Mark S as seen to avoid going back to S.
                    feasible_flow(Es, S, T), % First construct a feasible flow (if any)
@@ -119,13 +127,13 @@ gcc_global(Vs, KNs) -->
                    scc(Vals, gcc_successors),
                    phrase(gcc_goals(Vals), Gs)
                ;   Gs = [] )), Gs) },
-        disable_queue,
+        queue_disable,
         neq_nums(Gs),
-        enable_queue.
+        queue_enable.
 
 gcc_consistent(T) :-
         get_attr(T, edges, Es),
-        maplist(saturated_arc, Es).
+        list_map(saturated_arc, Es).
 
 saturated_arc(arc_from(_,U,_,Flow)) :- get_attr(Flow, flow, U).
 
@@ -161,8 +169,8 @@ maximum_flow(S, T) :-
             phrase(augmenting_path(S, T), Path),
             Path = [augment(_,First,_)|Rest],
             path_minimum(Rest, First, Min),
-            maplist(gcc_augment(Min), Path),
-            maplist(maplist(clear_parent), Levels),
+            list_map(gcc_augment(Min), Path),
+            list_map(list_map(clear_parent), Levels),
             maximum_flow(S, T)
         ;   true
         ).
@@ -176,13 +184,13 @@ make_arc_feasible(A, S, T) :-
         A = arc_to(L,_,V,F),
         get_attr(F, flow, Flow),
         (   Flow >= L -> true
-        ;   Diff is L - Flow,
+        ;   integer_add(Diff, Flow, L), % Diff #= L-Flow
             put_attr(V, parent, S-augment(F,Diff,+)),
             gcc_augmenting_path([[V]], Levels, T),
             phrase(augmenting_path(S, T), Path),
             path_minimum(Path, Diff, Min),
-            maplist(gcc_augment(Min), Path),
-            maplist(maplist(clear_parent), Levels),
+            list_map(gcc_augment(Min), Path),
+            list_map(list_map(clear_parent), Levels),
             make_arc_feasible(A, S, T)
         ).
 
@@ -218,7 +226,7 @@ gcc_reachable(arc_to(_L,U,V,F), P) -->
         (   { \+ get_attr(V, parent, _),
               get_attr(F, flow, Flow),
               Flow < U } ->
-            { Diff is U - Flow,
+            { integer_add(Diff, Flow, U), % Diff #= U-Flow
               put_attr(V, parent, P-augment(F,Diff,+)) },
             [V]
         ;   []
@@ -227,7 +235,7 @@ gcc_reachable(arc_to(_L,U,V,F), P) -->
 
 path_minimum([], Min, Min).
 path_minimum([augment(_,A,_)|As], Min0, Min) :-
-        Min1 is min(Min0,A),
+        integer_min(A, Min0, Min1),
         path_minimum(As, Min1, Min).
 
 gcc_augment(Min, augment(F,_,Sign)) :-
@@ -235,8 +243,8 @@ gcc_augment(Min, augment(F,_,Sign)) :-
         gcc_flow_(Sign, Flow0, Min, Flow),
         put_attr(F, flow, Flow).
 
-gcc_flow_(+, F0, A, F) :- F is F0 + A.
-gcc_flow_(-, F0, A, F) :- F is F0 - A.
+gcc_flow_(+, F0, A, F) :- integer_add(A, F0, F). % F #= F0+A
+gcc_flow_(-, F0, A, F) :- integer_add(F, A, F0). % F #= F0-A.
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    Build value network for global cardinality constraint.
@@ -247,9 +255,12 @@ gcc_arcs([Key-Num0|KNs], S, Vals) :-
         (   get_attr(Num0, clpz_gcc_vs, Vs) ->
             get_attr(Num0, clpz_gcc_num, Num),
             get_attr(Num0, clpz_gcc_occurred, Occ),
-            (   nonvar(Num) -> U is Num - Occ, U = L
+            (   nonvar(Num)
+            ->  integer_add(U, Occ, Num), % U #= Num-Occ
+                U = L
             ;   fd_get(Num, _, n(L0), n(U0), _),
-                L is L0 - Occ, U is U0 - Occ
+                integer_add(L, Occ, L0), % L #= L0-Occ
+                integer_add(U, Occ, U0) % U #= U0-Occ
             ),
             put_attr(Val, value, Key),
             Vals = [Val|Rest],
@@ -257,7 +268,7 @@ gcc_arcs([Key-Num0|KNs], S, Vals) :-
             append_edge(S, edges, arc_to(L, U, Val, F)),
             put_attr(Val, edges, [arc_from(L, U, S, F)]),
             variables_with_num_occurrences(Vs, VNs),
-            maplist(val_to_v(Val), VNs)
+            list_map(val_to_v(Val), VNs)
         ;   Vals = Rest
         ),
         gcc_arcs(KNs, S, Rest).
@@ -265,7 +276,8 @@ gcc_arcs([Key-Num0|KNs], S, Vals) :-
 variables_with_num_occurrences(Vs0, VNs) :-
         include(var, Vs0, Vs1),
         samsort(Vs1, Vs),
-        (   Vs == [] -> VNs = []
+        (   Vs == []
+        ->  VNs = []
         ;   Vs = [V|Rest],
             variables_with_num_occurrences(Rest, V, 1, VNs)
         ).
@@ -273,7 +285,7 @@ variables_with_num_occurrences(Vs0, VNs) :-
 variables_with_num_occurrences([], Prev, Count, [Prev-Count]).
 variables_with_num_occurrences([V|Vs], Prev, Count0, VNs) :-
         (   V == Prev ->
-            Count1 is Count0 + 1,
+            integer_add(1, Count0, Count1), % Count1 #= Count0+1,
             variables_with_num_occurrences(Vs, Prev, Count1, VNs)
         ;   VNs = [Prev-Count0|Rest],
             variables_with_num_occurrences(Vs, V, 1, Rest)
@@ -318,9 +330,9 @@ gcc_succ_edge(arc_from(_,_,V,F)) -->
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 gcc_check(Pairs) -->
-        disable_queue,
+        queue_disable,
         gcc_check_(Pairs),
-        enable_queue.
+        queue_enable.
 
 gcc_done(Num) :-
         del_attr(Num, clpz_gcc_vs),
@@ -335,7 +347,7 @@ gcc_check_([Key-Num0|KNs]) -->
               vs_key_min_others(Vs, Key, 0, Min, Os),
               put_attr(Num0, clpz_gcc_vs, Os),
               put_attr(Num0, clpz_gcc_occurred, Occ1),
-              Occ1 is Occ0 + Min },
+              integer_add(Min, Occ0, Occ1) /* Occ1 #= Occ0+Min */ },
             geq(Num, Occ1),
             % The queue is disabled for efficiency here in any case.
             % If it were enabled, make sure to retain the invariant
@@ -344,18 +356,19 @@ gcc_check_([Key-Num0|KNs]) -->
             % relevant constraints are posted).
             (   Occ1 == Num -> all_neq(Os, Key), { gcc_done(Num0) }
             ;   Os == [] -> { gcc_done(Num0) }, Num = Occ1
-            ;   { length(Os, L),
-                  Max is Occ1 + L },
+            ;   { list_length(Os, L),
+                  integer_add(Occ1, L, Max) /* Max #= Occ1+L */ },
                 geq(Max, Num),
-                (   { nonvar(Num) } -> Diff is Num - Occ1
+                (   { nonvar(Num) }
+                ->  { integer_add(Diff, Occ1, Num) } % Diff #= Num-Occ1
                 ;   { fd_get(Num, ND, _),
                       domain_infimum(ND, n(NInf)) },
-                    Diff is NInf - Occ1
+                    { integer_add(Diff, Occ1, NInf) } % Diff #= NInf-Occ1
                 ),
                 L >= Diff,
                 (   L =:= Diff ->
-                    Num is Occ1 + Diff,
-                    { maplist(=(Key), Os),
+                    { integer_add(Occ1, Diff, Num) }, % Num #= Occ1+Diff
+                    { list_map(=(Key), Os),
                       gcc_done(Num0) }
                 ;   true
                 )
@@ -372,8 +385,8 @@ vs_key_min_others([V|Vs], Key, Min0, Min, Others) :-
                 vs_key_min_others(Vs, Key, Min0, Min, Rest)
             ;   vs_key_min_others(Vs, Key, Min0, Min, Others)
             )
-        ;   (   V =:= Key ->
-                Min1 is Min0 + 1,
+        ;   (   V =:= Key
+            ->  integer_add(1, Min0, Min1), % Min1 #= Min0+1
                 vs_key_min_others(Vs, Key, Min1, Min, Others)
             ;   vs_key_min_others(Vs, Key, Min0, Min, Others)
             )

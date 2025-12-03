@@ -38,15 +38,16 @@
 % ```
 
 zcompare(Order, A, B) :-
-        (   nonvar(Order) ->
-            zcompare_(Order, A, B)
-        ;   integer(A), integer(B) ->
-            compare(Order, A, B)
-        ;   freeze(Order, zcompare_(Order, A, B)),
-            fd_variable(A),
-            fd_variable(B),
-            propagator_init_trigger([A,B], pzcompare(Order, A, B))
-        ).
+    (   nonvar(Order) ->
+        zcompare_(Order, A, B)
+    ;   integer(A), integer(B) ->
+        compare(Order, A, B)
+    ;   freeze(Order, zcompare_(Order, A, B)),
+        fd_variable(A),
+        fd_variable(B),
+        propagator_from_constraint(pzcompare(Order,A,B), P),
+        propagator_trigger(P, [A,B])
+    ).
 
 zcompare_(O, A, B) :-
         (   member(O, "<=>") -> true

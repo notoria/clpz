@@ -25,9 +25,9 @@
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 :- op(700, xfx, cis).
-:- op(700, xfx, cis_geq).
+:- op(700, xfx, cis_ge).
 :- op(700, xfx, cis_gt).
-:- op(700, xfx, cis_leq).
+:- op(700, xfx, cis_le).
 :- op(700, xfx, cis_lt).
 :- op(1200, xfx, ++>).
 :- op(800, xfx, =>).

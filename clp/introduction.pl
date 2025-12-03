@@ -326,11 +326,11 @@ over integers that can be easily solved with CLP(ℤ) constraints.
 
 ```
 sudoku(Rows) :-
-        length(Rows, 9), maplist(same_length(Rows), Rows),
-        append(Rows, Vs), Vs ins 1..9,
-        maplist(all_distinct, Rows),
+        list_length(Rows, 9), list_map(list_equisized(Rows), Rows),
+        list_append(Rows, Vs), Vs ins 1..9,
+        list_map(all_distinct, Rows),
         transpose(Rows, Columns),
-        maplist(all_distinct, Columns),
+        list_map(all_distinct, Columns),
         Rows = [As,Bs,Cs,Ds,Es,Fs,Gs,Hs,Is],
         blocks(As, Bs, Cs),
         blocks(Ds, Es, Fs),
@@ -355,7 +355,7 @@ problem(1, [[_,_,_,_,_,_,_,_,_],
 Sample query:
 
 ```
-?- problem(1, Rows), sudoku(Rows), maplist(portray_clause, Rows).
+?- problem(1, Rows), sudoku(Rows), list_map(portray_clause, Rows).
 [9,8,7,6,5,4,3,2,1].
 [2,4,6,1,7,3,9,8,5].
 [3,5,1,9,2,8,7,4,6].
@@ -530,7 +530,7 @@ integers that represents a solution in the form described above.
 
 ```
 n_queens(N, Qs) :-
-        length(Qs, N),
+        list_length(Qs, N),
         Qs ins 1..N,
         safe_queens(Qs).
 
@@ -673,32 +673,33 @@ custom constraint `oneground(X,Y,Z)`, where Z shall be 1 if at least
 one of X and Y is instantiated:
 
 ```
-:- multifile clpz:run_propagator/2.
+:- multifile clpz:propagate/2.
 
 oneground(X, Y, Z) :-
-        clpz:make_propagator(oneground(X, Y, Z), Prop),
-        clpz:init_propagator(X, Prop),
-        clpz:init_propagator(Y, Prop),
-        clpz:trigger_once(Prop).
+        clpz:propagator_from_constraint(oneground(X, Y, Z), Prop),
+        clpz:propagator_variable(Prop, X),
+        clpz:propagator_variable(Prop, Y),
+        clpz:queue_empty(Q),
+        phrase((clpz:propagator_queue(P), clpz:propagator_catalyze), [Q], _).
 
-clpz:run_propagator(oneground(X, Y, Z), MState) :-
+clpz:propagate(oneground(X, Y, Z), MState) :-
         (   integer(X) -> clpz:kill(MState), Z = 1
         ;   integer(Y) -> clpz:kill(MState), Z = 1
         ;   true
         ).
 ```
 
-First, `clpz:make_propagator/2` is used to transform a user-defined
+First, `clpz:propagator_from_constraint/2` is used to transform a user-defined
 representation of the new constraint to an internal form. With
-`clpz:init_propagator/2`, this internal form is then attached to X and
+`clpz:propagator_variable/2`, this internal form is then attached to X and
 Y. From now on, the propagator will be invoked whenever the domains of
 X or Y are changed. Then, `clpz:trigger_once/1` is used to give the
 propagator its first chance for propagation even though the variables'
-domains have not yet changed. Finally, `clpz:run_propagator/2` is
+domains have not yet changed. Finally, `clpz:propagate/2` is
 extended to define the actual propagator. As explained, this predicate
 is automatically called by the constraint solver. The first argument
 is the user-defined representation of the constraint as used in
-`clpz:make_propagator/2`, and the second argument is a mutable state
+`clpz:propagator_from_constraint/2`, and the second argument is a mutable state
 that can be used to prevent further invocations of the propagator when
 the constraint has become entailed, by using `clpz:kill/1`. An example
 of using the new constraint:

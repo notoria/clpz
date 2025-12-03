@@ -8,7 +8,7 @@
 %  S_i for all 1 =< i < j =< n. Example:
 %
 % ```
-% ?- length(Vs, 3),
+% ?- list_length(Vs, 3),
 %    Vs ins 0..3,
 %    serialized(Vs, [1,2,3]),
 %    label(Vs).
@@ -21,8 +21,14 @@
 %       Disjunctive Scheduling Problem"
 
 serialized(Starts, Durations) :-
+        must_be(list, Starts),
         must_be(list(integer), Durations),
+        % list_equisized(Durations, SDs),
         pairs_keys_values(SDs, Starts, Durations),
+        % Starts ins inf..sup,
+        domain_from_bounds(inf, sup, D0), list_map('@in'(D0), Starts),
+        % Durations ins 0..sup,
+        domain_from_bounds(n(0), sup, D1), list_map('@in'(D1), Durations),
         Orig = original_goal(_, serialized(Starts, Durations)),
         serialize(SDs, Orig).
 
@@ -34,9 +40,10 @@ serialize([S-D|SDs], Orig) :-
 
 serialize([], _, _, _).
 serialize([S-D|Rest], S0, D0, Orig) :-
-        D >= 0,
-        propagator_init_trigger([S0,S], pserialized(S,D,S0,D0,Orig)),
-        serialize(Rest, S0, D0, Orig).
+    D >= 0,
+    propagator_from_constraint(pserialized(S,D,S0,D0,Orig), P),
+    propagator_trigger(P, [S0,S]),
+    serialize(Rest, S0, D0, Orig).
 
 % consistency check / propagation
 % Currently implements 2-b-consistency
@@ -72,8 +79,8 @@ serialize_lower_bound(I, D_I, J, D_J, MState) -->
             (   nonvar(J) -> kill(MState)
             ;   []
             ),
-            { EST is EST_J+D_J,
-              domain_remove_smaller_than(DomI, EST, DomI1) },
+            { integer_add(EST_J, D_J, EST),
+              domain_remove_less_than(EST, DomI, DomI1) },
             fd_put(I, DomI1, Ps)
         ;   []
         ).
@@ -87,8 +94,8 @@ serialize_upper_bound(I, D_I, J, D_J, MState) -->
             (   nonvar(J) -> kill(MState)
             ;   []
             ),
-            { LST is LST_J-D_I,
-              domain_remove_greater_than(DomI, LST, DomI1) },
+            { integer_add(LST, D_I, LST_J),
+              domain_remove_greater_than(LST, DomI, DomI1) },
             fd_put(I, DomI1, Ps)
         ;   []
         ).

@@ -1,156 +1,253 @@
-% goal_expansion(A cis B, Expansion) :-
-%         phrase(cis_goals(B, A), Goals),
-%         list_goal(Goals, Expansion).
-% goal_expansion(A cis_lt B, B cis_gt A).
-% goal_expansion(A cis_leq B, B cis_geq A).
-% goal_expansion(A cis_geq B, cis_leq_numeric(B, N)) :- nonvar(A), A = n(N).
-% goal_expansion(A cis_geq B, cis_geq_numeric(A, N)) :- nonvar(B), B = n(N).
-% goal_expansion(A cis_gt B, cis_lt_numeric(B, N))   :- nonvar(A), A = n(N).
-% goal_expansion(A cis_gt B, cis_gt_numeric(A, N))   :- nonvar(B), B = n(N).
-
-A cis B :-
-    phrase(cis_goals(B, A), Goals),
-    list_goal(Goals, Expansion),
-    call(Expansion).
-A cis_lt B :-
-    B cis_gt A.
-A cis_leq B :-
-    B cis_geq A.
-% Defined elsewhere.
-% A cis_geq B :-
-%      nonvar(A), A = n(N),
-%      cis_leq_numeric(B, N).
-% A cis_geq B :-
-%     nonvar(B), B = n(N),
-%     cis_geq_numeric(A, N).
-% A cis_gt B :-
-%     nonvar(A), A = n(N),
-%     cis_lt_numeric(B, N).
-% A cis_gt B :-
-%     nonvar(B), B = n(N),
-%     cis_gt_numeric(A, N).
-
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   A bound is either:
-
-   n(N):    integer N
-   inf:     infimum of Z (= negative infinity)
-   sup:     supremum of Z (= positive infinity)
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-is_bound(n(N)) :- integer(N).
-is_bound(inf).
-is_bound(sup).
-
-defaulty_to_bound(D, P) :- ( integer(D) -> P = n(D) ; P = D ).
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Compactified is/2 and predicates for several arithmetic expressions
+   Compactified `(is)/2` and predicates for several arithmetic expressions
    with infinities, tailored for the modes needed by this solver.
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-% cis_gt only works for terms of depth 0 on both sides
-cis_gt(sup, B0) :- B0 \== sup.
-cis_gt(n(N), B) :- cis_lt_numeric(B, N).
+% cis_compare(_, A, B) :-
+%     member(C, [A,B]),
+%     % var(C),
+%     % throw(error(instantiation_error,cis_compare/3)).
+%     \+ bound(C),
+%     throw(error(domain_error(bound,C),cis_compare/3)).
+cis_compare(_, A, _) :-
+    var(A),
+    throw(error(instantiation_error,cis_compare/3)).
+cis_compare(_, _, B) :-
+    var(B),
+    throw(error(instantiation_error,cis_compare/3)).
+cis_compare(=, inf, inf). % Extension
+cis_compare(<, inf, n(_)).
+cis_compare(<, inf, sup).
+cis_compare(>, n(_), inf).
+cis_compare(R, n(A), n(B)) :-
+    integer(A, true),
+    integer(B, true),
+    compare(R, A, B).
+cis_compare(<, n(_), sup).
+cis_compare(>, sup, inf).
+cis_compare(>, sup, n(_)).
+cis_compare(=, sup, sup). % Extension
 
-cis_lt_numeric(inf, _).
-cis_lt_numeric(n(B), A) :- B < A.
+cis_compare(R, A0, B0, A, B) :-
+    cis_compare(R, A0, B0),
+    cis_compare_(R, A0, B0, A, B).
 
-cis_gt_numeric(sup, _).
-cis_gt_numeric(n(B), A) :- B > A.
+cis_compare_(<, A, B, A, B).
+cis_compare_(=, A, A, A, A).
+cis_compare_(>, A, B, B, A).
 
-cis_geq(inf, inf).
-cis_geq(sup, _).
-cis_geq(n(N), B) :- cis_leq_numeric(B, N).
+cis_lt(A, B) :- cis_compare(<, A, B).
 
-cis_leq_numeric(inf, _).
-cis_leq_numeric(n(B), A) :- B =< A.
+'@cis_le'(=).
+'@cis_le'(<).
 
-cis_geq_numeric(sup, _).
-cis_geq_numeric(n(B), A) :- B >= A.
+cis_le(A, B) :- cis_compare(O, A, B), '@cis_le'(O).
 
-cis_min(inf, _, inf).
-cis_min(sup, B, B).
-cis_min(n(N), B, Min) :- cis_min_(B, N, Min).
+'@cis_ge'(>).
+'@cis_ge'(=).
 
-cis_min_(inf, _, inf).
-cis_min_(sup, N, n(N)).
-cis_min_(n(B), A, n(M)) :- M is min(A,B).
+cis_ge(A, B) :- cis_compare(O, A, B), '@cis_ge'(O).
 
-cis_max(sup, _, sup).
-cis_max(inf, B, B).
-cis_max(n(N), B, Max) :- cis_max_(B, N, Max).
+cis_gt(A, B) :- cis_compare(>, A, B).
 
-cis_max_(inf, N, n(N)).
-cis_max_(sup, _, sup).
-cis_max_(n(B), A, n(M)) :- M is max(A,B).
+cis_min(A, B, C) :- cis_compare(_, A, B, C, _).
 
-cis_plus(inf, _, inf).
-cis_plus(sup, _, sup).
-cis_plus(n(A), B, Plus) :- cis_plus_(B, A, Plus).
+cis_max(A, B, C) :- cis_compare(_, A, B, _, C).
 
-cis_plus_(sup, _, sup).
-cis_plus_(inf, _, inf).
-cis_plus_(n(B), A, n(S)) :- S is A + B.
+cis_add(inf, inf, inf).
+cis_add(inf, n(_), inf).
+cis_add(n(_), inf, inf).
+cis_add(n(A), n(B), n(C)) :- C is A+B.
+cis_add(n(_), sup, sup).
+cis_add(sup, n(_), sup).
+cis_add(sup, sup, sup).
 
-cis_minus(inf, _, inf).
-cis_minus(sup, _, sup).
-cis_minus(n(A), B, M) :- cis_minus_(B, A, M).
+cis_sub(A, B0, C) :-
+    cis_neg(B0, B),
+    cis_add(A, B, C).
 
-cis_minus_(inf, _, sup).
-cis_minus_(sup, _, inf).
-cis_minus_(n(B), A, n(M)) :- M is A - B.
-
-cis_uminus(inf, sup).
-cis_uminus(sup, inf).
-cis_uminus(n(A), n(B)) :- B is -A.
+cis_neg(inf, sup).
+cis_neg(n(A), n(B)) :- B is -A.
+cis_neg(sup, inf).
 
 cis_abs(inf, sup).
-cis_abs(sup, sup).
 cis_abs(n(A), n(B)) :- B is abs(A).
+cis_abs(sup, sup).
 
-cis_times(inf, B, P) :-
-        (   B cis_lt n(0) -> P = sup
-        ;   B cis_gt n(0) -> P = inf
-        ;   P = n(0)
-        ).
-cis_times(sup, B, P) :-
-        (   B cis_gt n(0) -> P = sup
-        ;   B cis_lt n(0) -> P = inf
-        ;   P = n(0)
-        ).
-cis_times(n(N), B, P) :- cis_times_(B, N, P).
+cis_mul(inf, B, C) :-
+    cis_compare(R, n(0), B),
+    cis_mul_inf(R, C).
+cis_mul(n(A), inf, C) :-
+    cis_compare(R, n(0), n(A)),
+    cis_mul_inf(R, C).
+cis_mul(n(A), n(B), n(C)) :-
+    C is A*B.
+cis_mul(n(A), sup, C) :-
+    cis_compare(R, n(0), n(A)),
+    cis_mul_sup(R, C).
+cis_mul(sup, B, C) :-
+    cis_compare(R, n(0), B),
+    cis_mul_sup(R, C).
 
-cis_times_(inf, A, P)     :- cis_times(inf, n(A), P).
-cis_times_(sup, A, P)     :- cis_times(sup, n(A), P).
-cis_times_(n(B), A, n(P)) :- P is A * B.
+cis_mul_inf(<, inf).
+cis_mul_inf(=, n(0)). % Extension
+cis_mul_inf(>, sup).
 
-cis_exp(inf, n(Y), R) :-
-        (   even(Y) -> R = sup
-        ;   R = inf
-        ).
-cis_exp(sup, _, sup).
-cis_exp(n(N), Y, R) :- cis_exp_(Y, N, R).
+cis_mul_sup(<, sup).
+cis_mul_sup(=, n(0)). % Extension
+cis_mul_sup(>, inf).
 
-cis_exp_(n(Y), N, n(R)) :- R is N^Y.
-cis_exp_(sup, _, sup).
-cis_exp_(inf, _, inf).
+cis_exp(inf, n(B), C) :- % Undefined Behavior if negative
+    B @>= 0,
+    R0 is sign(B),
+    R1 is 2*(B mod 2)-1,
+    cis_mul(inf, n(R1), C0),
+    cis_mul(n(R0), C0, C1),
+    cis_add(n(1), C1, C).
+cis_exp(n(A), n(B), n(C)) :- % Undefined Behavior if negative
+    C is A^B.
+cis_exp(n(1), inf, n(1)).
+cis_exp(n(A), sup, sup) :-
+    A @> 1.
+cis_exp(n(1), sup, n(1)).
+cis_exp(n(0), sup, n(0)).
+cis_exp(sup, n(B), C) :- % Undefined Behavior if negative
+    B @>= 0,
+    R0 is sign(B),
+    cis_mul(sup, n(R0), C0),
+    cis_add(n(1), C0, C).
+cis_exp(sup, sup, sup).
 
-cis_goals(V, _)          --> { var(V), !, instantiation_error(V) }.
-cis_goals(n(N), n(N))    --> [].
+cis_sign(sup, n(1)).
+cis_sign(inf, n(-1)).
+cis_sign(n(N), n(S)) :- S is sign(N).
+
+cis_div(inf, n(B), C) :-
+    cis_compare(R, n(0), n(B)),
+    cis_div_inf(R, C).
+cis_div(n(_), inf, n(0)).
+% cis_div(n(A), n(B), C) :-
+%     cis_compare(R, n(0), n(B)),
+%     cis_div_num(R, A, B, C).
+cis_div(n(A), n(B), n(C)) :-
+    \+ cis_compare(=, n(0), n(B)),
+    C is A div B.
+cis_div(n(_), sup, n(0)).
+cis_div(sup, n(B), C) :-
+    cis_compare(R, n(0), n(B)),
+    cis_div_sup(R, C).
+
+cis_div_inf(<, inf).
+% cis_div_inf(=, inf). % stable
+cis_div_inf(>, sup).
+
+cis_div_num(<, A, B, n(C)) :-
+    C is A div B.
+% cis_div_num(=, A, 0, C) :-
+%     \+ cis_compare(=, n(0), A),
+%     cis_mul(sup, A, C).
+cis_div_num(>, A, B, n(C)) :-
+    C is A div B.
+
+cis_div_sup(<, sup).
+% cis_div_sup(=, sup). % stable
+cis_div_sup(>, inf).
+
+cis_slash(inf, n(B), C) :-
+    cis_compare(R, n(0), n(B)),
+    cis_slash_inf(R, C).
+cis_slash(n(_), inf, n(0)).
+% cis_slash(n(A), n(B), C) :-
+%     cis_compare(R, n(0), n(B)),
+%     cis_slash_num(R, A, B, C).
+cis_slash(n(A), n(B), n(C)) :-
+    \+ cis_compare(=, n(0), n(B)),
+    C is A//B.
+cis_slash(n(_), sup, n(0)).
+cis_slash(sup, n(B), C) :-
+    cis_compare(R, n(0), n(B)),
+    cis_slash_sup(R, C).
+
+cis_slash_inf(<, inf).
+% cis_slash_inf(=, inf). % stable
+cis_slash_inf(>, sup).
+
+cis_slash_sup(<, sup).
+% cis_slash_sup(=, sup). % stable
+cis_slash_sup(>, inf).
+
+cis(_, E) :-
+    var(E),
+    throw(error(instantiation_error,(cis)/2)).
+cis(E, inf) :-
+    E = inf.
+cis(E, n(N)) :-
+    integer(N),
+    E = n(N).
+cis(E, sup) :-
+    E = sup.
+cis(E, sign(E0)) :-
+    cis(E1, E0),
+    cis_sign(E1, E).
+cis(E, abs(E0)) :-
+    cis(E1, E0),
+    cis_abs(E1, E).
+cis(E, -E0) :-
+    cis(E1, E0),
+    cis_neg(E1, E).
+cis(E, E0+E1) :-
+    cis(E2, E0),
+    cis(E3, E1),
+    cis_add(E2, E3, E).
+cis(E, E0-E1) :-
+    cis(E2, E0),
+    cis(E3, E1),
+    cis_sub(E2, E3, E).
+cis(E, min(E0,E1)) :-
+    cis(E2, E0),
+    cis(E3, E1),
+    cis_min(E2, E3, E).
+cis(E, max(E0,E1)) :-
+    cis(E2, E0),
+    cis(E3, E1),
+    cis_max(E2, E3, E).
+cis(E, E0*E1) :-
+    cis(E2, E0),
+    cis(E3, E1),
+    cis_mul(E2, E3, E).
+cis(E, E0 div E1) :-
+    cis(E2, E0),
+    cis(E3, E1),
+    cis_div(E2, E3, E).
+cis(E, E0//E1) :-
+    cis(E2, E0),
+    cis(E3, E1),
+    cis_slash(E2, E3, E).
+cis(E, E0^E1) :-
+    cis(E2, E0),
+    cis(E3, E1),
+    cis_exp(E2, E3, E).
+
+% cis(A, B) :-
+%     phrase(cis_goals(B, A), Goals),
+%     list_map(call, Goals).
+
+% cis_goals(V, _)          --> { var(V), !, instantiation_error(V) }.
+% cis_goals(E, R)          --> { var(E) }, !, [R cis E].
+cis_goals(n(N), R)       --> { integer(N), R = n(N) }.
 cis_goals(inf, inf)      --> [].
 cis_goals(sup, sup)      --> [].
 cis_goals(sign(A0), R)   --> cis_goals(A0, A), [cis_sign(A, R)].
 cis_goals(abs(A0), R)    --> cis_goals(A0, A), [cis_abs(A, R)].
-cis_goals(-A0, R)        --> cis_goals(A0, A), [cis_uminus(A, R)].
+cis_goals(-A0, R)        --> cis_goals(A0, A), [cis_neg(A, R)].
 cis_goals(A0+B0, R)      -->
         cis_goals(A0, A),
         cis_goals(B0, B),
-        [cis_plus(A, B, R)].
+        [cis_add(A, B, R)].
 cis_goals(A0-B0, R)      -->
         cis_goals(A0, A),
         cis_goals(B0, B),
-        [cis_minus(A, B, R)].
+        [cis_sub(A, B, R)].
 cis_goals(min(A0,B0), R) -->
         cis_goals(A0, A),
         cis_goals(B0, B),
@@ -162,7 +259,7 @@ cis_goals(max(A0,B0), R) -->
 cis_goals(A0*B0, R)      -->
         cis_goals(A0, A),
         cis_goals(B0, B),
-        [cis_times(A, B, R)].
+        [cis_mul(A, B, R)].
 cis_goals(div(A0,B0), R) -->
         cis_goals(A0, A),
         cis_goals(B0, B),
@@ -176,30 +273,11 @@ cis_goals(A0^B0, R)      -->
         cis_goals(B0, B),
         [cis_exp(A, B, R)].
 
-list_goal([], true).
-list_goal([G|Gs], Goal) :- foldl(list_goal_, Gs, G, Goal).
+goal_expansion(
+    cis(R, E),
+    (call(cis(R0, E)) -> R = R0 ; throw(error(cis_error(E),(cis)/2)))
+).
 
-list_goal_(G, G0, (G0,G)).
-
-cis_sign(sup, n(1)).
-cis_sign(inf, n(-1)).
-cis_sign(n(N), n(S)) :- S is sign(N).
-
-cis_div(sup, Y, Z)  :- ( Y cis_geq n(0) -> Z = sup ; Z = inf ).
-cis_div(inf, Y, Z)  :- ( Y cis_geq n(0) -> Z = inf ; Z = sup ).
-cis_div(n(X), Y, Z) :- cis_div_(Y, X, Z).
-
-cis_div_(sup, _, n(0)).
-cis_div_(inf, _, n(0)).
-cis_div_(n(Y), X, Z) :-
-        (   Y =:= 0 -> (  X >= 0 -> Z = sup ; Z = inf )
-        ;   Z0 is X // Y, Z = n(Z0)
-        ).
-
-cis_slash(sup, _, sup).
-cis_slash(inf, _, inf).
-cis_slash(n(N), B, S) :- cis_slash_(B, N, S).
-
-cis_slash_(sup, _, n(0)).
-cis_slash_(inf, _, n(0)).
-cis_slash_(n(B), A, n(S)) :- S is A // B.
+% goal_expansion(A cis B, Expansion) :-
+%         phrase(cis_goals(B, A), Goals),
+%         goals_goal(',', Goals, Expansion).

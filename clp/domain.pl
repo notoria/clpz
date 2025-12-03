@@ -1,475 +1,422 @@
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   A domain is a finite set of disjoint intervals. Internally, domains
-   are represented as trees. Each node is one of:
+/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    Domain
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-   empty: empty domain.
+domain(D) :-
+    var(D),
+    throw(error(instantiation_error,domain/1)).
+domain(D) :-
+    domain_to_intervals(D, Is),
+    domain_from_intervals(Is, D),
+    intervals(Is).
+% domain(empty).
+% domain(from_to(L,F,T,R)) :-
+%     bound(F),
+%     bound(T),
+%     F cis_le T, F \== sup, T \== inf,
+%     domain(L),
+%     domain(R),
+%     domain_check_sup(L, F),
+%     domain_check_inf(R, T).
+% 
+% domain_check_sup(empty, _).
+% domain_check_sup(from_to(L,F,T,R), S) :-
+%     domain_supremum(from_to(L,F,T,R), S0),
+%     S1 cis S0+n(1), % there is a hole.
+%     S1 cis_lt S.
+% 
+% domain_check_inf(empty, _).
+% domain_check_inf(from_to(L,F,T,R), I) :-
+%     domain_infimum(from_to(L,F,T,R), I0),
+%     I1 cis I0-n(1), % there is a hole.
+%     I1 cis_gt I.
 
-   split(N, Left, Right)
-      - split on integer N, with Left and Right domains whose elements are
-        all less than and greater than N, respectively. The domain is the
-        union of Left and Right, i.e., N is a hole.
+domain_empty(empty).
 
-   from_to(From, To)
-      - interval (From-1, To+1); From and To are bounds
+domain_empty(empty, true).
+domain_empty(from_to(_,_,_,_), false).
 
-   Desiderata: rebalance domains; singleton intervals.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+domain_singleton(from_to(D,I,I,D), I) :-
+    domain_empty(D),
+    I = n(_).
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Type definition and inspection of domains.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+domain_from_bounds(I, S, D) :-
+    cis_compare(O, I, S),
+    '@domain_from_bounds'(O, I, S, D).
 
-check_domain(D) :-
-        (   var(D) -> instantiation_error(D)
-        ;   is_domain(D) -> true
-        ;   domain_error(clpz_domain, D)
-        ).
+'@domain_from_bounds'(>, _, _, empty).
+'@domain_from_bounds'(=, N, N, from_to(empty,N,N,empty)) :-
+    N = n(_).
+'@domain_from_bounds'(<, I, S, from_to(empty,I,S,empty)).
 
-is_domain(empty).
-is_domain(from_to(From,To)) :-
-        is_bound(From), is_bound(To),
-        From cis_leq To.
-is_domain(split(S, Left, Right)) :-
-        integer(S),
-        is_domain(Left), is_domain(Right),
-        all_less_than(Left, S),
-        all_greater_than(Right, S).
+domain_infimum(D, I) :-
+    '@domain_infimum'(D, sup, I).
 
-all_less_than(empty, _).
-all_less_than(from_to(From,To), S) :-
-        From cis_lt n(S), To cis_lt n(S).
-all_less_than(split(S0,Left,Right), S) :-
-        S0 < S,
-        all_less_than(Left, S),
-        all_less_than(Right, S).
+'@domain_infimum'(empty, I, I).
+'@domain_infimum'(from_to(L,F,_,_), _, I) :-
+    '@domain_infimum'(L, F, I).
 
-all_greater_than(empty, _).
-all_greater_than(from_to(From,To), S) :-
-        From cis_gt n(S), To cis_gt n(S).
-all_greater_than(split(S0,Left,Right), S) :-
-        S0 > S,
-        all_greater_than(Left, S),
-        all_greater_than(Right, S).
+domain_supremum(D, S) :-
+    '@domain_supremum'(D, inf, S).
 
-default_domain(from_to(inf,sup)).
+'@domain_supremum'(empty, S, S).
+'@domain_supremum'(from_to(_,_,T,R), _, S) :-
+    '@domain_supremum'(R, T, S).
 
-domain_infimum(from_to(I, _), I).
-domain_infimum(split(_, Left, _), I) :- domain_infimum(Left, I).
+domain_length(empty, n(0)).
+domain_length(from_to(L,F,T,R), S) :-
+    domain_length(L, S0),
+    domain_length(R, S1),
+    S cis S0+T-F+n(1)+S1.
 
-domain_supremum(from_to(_, S), S).
-domain_supremum(split(_, _, Right), S) :- domain_supremum(Right, S).
+domain_diameter(Dom, Dia) :-
+    domain_infimum(Dom, I),
+    domain_supremum(Dom, S),
+    Dia cis S-I.
 
-domain_num_elements(empty, n(0)).
-domain_num_elements(from_to(From,To), Num) :- Num cis To - From + n(1).
-domain_num_elements(split(_, Left, Right), Num) :-
-        domain_num_elements(Left, NL),
-        domain_num_elements(Right, NR),
-        Num cis NL + NR.
+domain_direction_element(D, up, E) :-
+    domain_up_element(D, E).
+domain_direction_element(D, down, E) :-
+    domain_down_element(D, E).
 
-domain_direction_element(from_to(n(From), n(To)), Dir, E) :-
-        (   Dir == up -> between(From, To, E)
-        ;   between(From, To, E0),
-            E is To - (E0 - From)
-        ).
-domain_direction_element(split(_, D1, D2), Dir, E) :-
-        (   Dir == up ->
-            (   domain_direction_element(D1, Dir, E)
-            ;   domain_direction_element(D2, Dir, E)
-            )
-        ;   (   domain_direction_element(D2, Dir, E)
-            ;   domain_direction_element(D1, Dir, E)
-            )
-        ).
+domain_up_element(from_to(L,_,_,_), E) :-
+    domain_up_element(L, E).
+domain_up_element(from_to(_,n(F),n(T),_), E) :-
+    integer_between(F, T, E).
+domain_up_element(from_to(_,_,_,R), E) :-
+    domain_up_element(R, E).
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Test whether domain contains a given integer.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+domain_down_element(from_to(_,_,_,R), E) :-
+    domain_down_element(R, E).
+domain_down_element(from_to(_,n(F),n(T),_), E) :-
+    integer_between(F, T, E0),
+    E is T-(E0-F).
+domain_down_element(from_to(L,_,_,_), E) :-
+    domain_down_element(L, E).
 
-domain_contains(from_to(From,To), I) :- From cis_leq n(I), n(I) cis_leq To.
-domain_contains(split(S, Left, Right), I) :-
-        (   I < S -> domain_contains(Left, I)
-        ;   I > S -> domain_contains(Right, I)
-        ).
+% Membership.
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Test whether a domain contains another domain.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+domain_contains(D, E) :-
+    domain_contains(D, E, true).
 
-domain_subdomain(Dom, Sub) :- domain_subdomain(Dom, Dom, Sub).
+domain_contains(empty, _, false).
+domain_contains(from_to(L,F,T,R), E, Truth) :-
+    cis_compare(O0, n(E), F),
+    cis_compare(O1, n(E), T),
+    '@domain_contains'(O0, O1, L, R, E, Truth).
 
-domain_subdomain(from_to(_,_), Dom, Sub) :-
-        domain_subdomain_fromto(Sub, Dom).
-domain_subdomain(split(_, _, _), Dom, Sub) :-
-        domain_subdomain_split(Sub, Dom, Sub).
+'@domain_contains'(<, <, D, _, E, T) :-
+    domain_contains(D, E, T).
+'@domain_contains'(>, <, _, _, _, true).
+'@domain_contains'(=, <, _, _, _, true).
+'@domain_contains'(>, =, _, _, _, true).
+'@domain_contains'(=, =, _, _, _, true).
+'@domain_contains'(>, >, _, D, E, T) :-
+    domain_contains(D, E, T).
 
-domain_subdomain_split(empty, _, _).
-domain_subdomain_split(from_to(From,To), split(S,Left0,Right0), Sub) :-
-        (   To cis_lt n(S) -> domain_subdomain(Left0, Left0, Sub)
-        ;   From cis_gt n(S) -> domain_subdomain(Right0, Right0, Sub)
-        ).
-domain_subdomain_split(split(_,Left,Right), Dom, _) :-
-        domain_subdomain(Dom, Dom, Left),
-        domain_subdomain(Dom, Dom, Right).
+domain_includes(_, empty).
+domain_includes(D, from_to(L,F,T,R)) :-
+    '@domain_includes'(D, F-T),
+    domain_includes(D, L),
+    domain_includes(D, R).
 
-domain_subdomain_fromto(empty, _).
-domain_subdomain_fromto(from_to(From,To), from_to(From0,To0)) :-
-        From0 cis_leq From, To0 cis_geq To.
-domain_subdomain_fromto(split(_,Left,Right), Dom) :-
-        domain_subdomain_fromto(Left, Dom),
-        domain_subdomain_fromto(Right, Dom).
+'@domain_includes'(from_to(L0,F0,T0,R0), F-T) :-
+    cis_compare(O0, F, T0),
+    cis_compare(O1, T, F0),
+    '@domain_includes'(O0, O1, from_to(L0,F0,T0,R0), F-T).
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Remove an integer from a domain. The domain is traversed until an
-   interval is reached from which the element can be removed, or until
-   it is clear that no such interval exists.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+'@domain_includes'(<, <, from_to(L,_,_,_), I) :-
+    '@domain_includes'(L, I).
+'@domain_includes'(<, >, from_to(_,F0,T0,_), F-T) :-
+    F0 cis_le F, T cis_le T0.
+'@domain_includes'(<, =, from_to(_,F0,T0,_), F-T) :-
+    F0 cis_le F, T cis_le T0.
+'@domain_includes'(=, >, from_to(_,F0,T0,_), F-T) :-
+    F0 cis_le F, T cis_le T0.
+'@domain_includes'(=, =, from_to(_,F0,T0,_), F-T) :-
+    F0 cis_le F, T cis_le T0.
+'@domain_includes'(>, >, from_to(_,_,_,R), I) :-
+    '@domain_includes'(R, I).
 
-domain_remove(empty, _, empty).
-domain_remove(from_to(L0, U0), X, D) :- domain_remove_(L0, U0, X, D).
-domain_remove(split(S, Left0, Right0), X, D) :-
-        (   X =:= S -> D = split(S, Left0, Right0)
-        ;   X < S ->
-            domain_remove(Left0, X, Left1),
-            (   Left1 == empty -> D = Right0
-            ;   D = split(S, Left1, Right0)
-            )
-        ;   domain_remove(Right0, X, Right1),
-            (   Right1 == empty -> D = Left0
-            ;   D = split(S, Left0, Right1)
-            )
-        ).
-
-%?- domain_remove(from_to(n(0),n(5)), 3, D).
-
-domain_remove_(inf, U0, X, D) :-
-        (   U0 == n(X) -> U1 is X - 1, D = from_to(inf, n(U1))
-        ;   U0 cis_lt n(X) -> D = from_to(inf,U0)
-        ;   L1 is X + 1, U1 is X - 1,
-            D = split(X, from_to(inf, n(U1)), from_to(n(L1),U0))
-        ).
-domain_remove_(n(N), U0, X, D) :- domain_remove_upper(U0, N, X, D).
-
-domain_remove_upper(sup, L0, X, D) :-
-        (   L0 =:= X -> L1 is X + 1, D = from_to(n(L1),sup)
-        ;   L0 > X -> D = from_to(n(L0),sup)
-        ;   L1 is X + 1, U1 is X - 1,
-            D = split(X, from_to(n(L0),n(U1)), from_to(n(L1),sup))
-        ).
-domain_remove_upper(n(U0), L0, X, D) :-
-        (   L0 =:= U0, X =:= L0 -> D = empty
-        ;   L0 =:= X -> L1 is X + 1, D = from_to(n(L1), n(U0))
-        ;   U0 =:= X -> U1 is X - 1, D = from_to(n(L0), n(U1))
-        ;   between(L0, U0, X) ->
-            U1 is X - 1, L1 is X + 1,
-            D = split(X, from_to(n(L0), n(U1)), from_to(n(L1), n(U0)))
-        ;   D = from_to(n(L0),n(U0))
-        ).
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Remove all elements greater than / less than a constant.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-domain_remove_greater_than(empty, _, empty).
-domain_remove_greater_than(from_to(From0,To0), G, D) :-
-        (   From0 cis_gt n(G) -> D = empty
-        ;   To cis min(To0,n(G)), D = from_to(From0,To)
-        ).
-domain_remove_greater_than(split(S,Left0,Right0), G, D) :-
-        (   S =< G ->
-            domain_remove_greater_than(Right0, G, Right),
-            (   Right == empty -> D = Left0
-            ;   D = split(S, Left0, Right)
-            )
-        ;   domain_remove_greater_than(Left0, G, D)
-        ).
-
-domain_remove_smaller_than(empty, _, empty).
-domain_remove_smaller_than(from_to(From0,To0), V, D) :-
-        (   To0 cis_lt n(V) -> D = empty
-        ;   From cis max(From0,n(V)), D = from_to(From,To0)
-        ).
-domain_remove_smaller_than(split(S,Left0,Right0), V, D) :-
-        (   S >= V ->
-            domain_remove_smaller_than(Left0, V, Left),
-            (   Left == empty -> D = Right0
-            ;   D = split(S, Left, Right0)
-            )
-        ;   domain_remove_smaller_than(Right0, V, D)
-        ).
-
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Remove a whole domain from another domain. (Set difference.)
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-domain_subtract(Dom0, Sub, Dom) :- domain_subtract(Dom0, Dom0, Sub, Dom).
-
-domain_subtract(empty, _, _, empty).
-domain_subtract(from_to(From0,To0), Dom, Sub, D) :-
-        (   Sub == empty -> D = Dom
-        ;   Sub = from_to(From,To) ->
-            (   From == To -> From = n(X), domain_remove(Dom, X, D)
-            ;   From cis_gt To0 -> D = Dom
-            ;   To cis_lt From0 -> D = Dom
-            ;   From cis_leq From0 ->
-                (   To cis_geq To0 -> D = empty
-                ;   From1 cis To + n(1),
-                    D = from_to(From1, To0)
-                )
-            ;   To1 cis From - n(1),
-                (   To cis_lt To0 ->
-                    From = n(S),
-                    From2 cis To + n(1),
-                    D = split(S,from_to(From0,To1),from_to(From2,To0))
-                ;   D = from_to(From0,To1)
-                )
-            )
-        ;   Sub = split(S, Left, Right) ->
-            (   n(S) cis_gt To0 -> domain_subtract(Dom, Dom, Left, D)
-            ;   n(S) cis_lt From0 -> domain_subtract(Dom, Dom, Right, D)
-            ;   domain_subtract(Dom, Dom, Left, D1),
-                domain_subtract(D1, D1, Right, D)
-            )
-        ).
-domain_subtract(split(S, Left0, Right0), _, Sub, D) :-
-        domain_subtract(Left0, Left0, Sub, Left),
-        domain_subtract(Right0, Right0, Sub, Right),
-        (   Left == empty -> D = Right
-        ;   Right == empty -> D = Left
-        ;   D = split(S, Left, Right)
-        ).
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Complement of a domain
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-domain_complement(D, C) :-
-        default_domain(Default),
-        domain_subtract(Default, D, C).
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Convert domain to a list of disjoint intervals From-To.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-domain_intervals(D, Is) :- phrase(domain_intervals(D), Is).
-
-domain_intervals(split(_, Left, Right)) -->
-        domain_intervals(Left), domain_intervals(Right).
-domain_intervals(empty)                 --> [].
-domain_intervals(from_to(From,To))      --> [From-To].
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   To compute the intersection of two domains D1 and D2, we choose D1
-   as the reference domain. For each interval of D1, we compute how
-   far and to which values D2 lets us extend it.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-domains_intersection(D1, D2, Intersection) :-
-        domains_intersection_(D1, D2, Intersection),
-        Intersection \== empty.
-
-domains_intersection_(empty, _, empty).
-domains_intersection_(from_to(L0,U0), D2, Dom) :-
-        narrow(D2, L0, U0, Dom).
-domains_intersection_(split(S,Left0,Right0), D2, Dom) :-
-        domains_intersection_(Left0, D2, Left1),
-        domains_intersection_(Right0, D2, Right1),
-        (   Left1 == empty -> Dom = Right1
-        ;   Right1 == empty -> Dom = Left1
-        ;   Dom = split(S, Left1, Right1)
-        ).
-
-narrow(empty, _, _, empty).
-narrow(from_to(L0,U0), From0, To0, Dom) :-
-        From1 cis max(From0,L0), To1 cis min(To0,U0),
-        (   From1 cis_gt To1 -> Dom = empty
-        ;   Dom = from_to(From1,To1)
-        ).
-narrow(split(S, Left0, Right0), From0, To0, Dom) :-
-        (   To0 cis_lt n(S) -> narrow(Left0, From0, To0, Dom)
-        ;   From0 cis_gt n(S) -> narrow(Right0, From0, To0, Dom)
-        ;   narrow(Left0, From0, To0, Left1),
-            narrow(Right0, From0, To0, Right1),
-            (   Left1 == empty -> Dom = Right1
-            ;   Right1 == empty -> Dom = Left1
-            ;   Dom = split(S, Left1, Right1)
-            )
-        ).
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Union of 2 domains.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-domains_union(D1, D2, Union) :-
-        domain_intervals(D1, Is1),
-        domain_intervals(D2, Is2),
-        append(Is1, Is2, IsU0),
-        merge_intervals(IsU0, IsU1),
-        intervals_to_domain(IsU1, Union).
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Shift the domain by an offset.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-domain_shift(empty, _, empty).
-domain_shift(from_to(From0,To0), O, from_to(From,To)) :-
-        From cis From0 + n(O), To cis To0 + n(O).
-domain_shift(split(S0, Left0, Right0), O, split(S, Left, Right)) :-
-        S is S0 + O,
-        domain_shift(Left0, O, Left),
-        domain_shift(Right0, O, Right).
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   The new domain contains all values of the old domain,
-   multiplied by a constant multiplier.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-domain_expand(D0, M, D) :-
-        (   M < 0 ->
-            domain_negate(D0, D1),
-            M1 is abs(M),
-            domain_expand_(D1, M1, D)
-        ;   M =:= 1 -> D = D0
-        ;   domain_expand_(D0, M, D)
-        ).
-
-domain_expand_(empty, _, empty).
-domain_expand_(from_to(From0, To0), M, from_to(From,To)) :-
-        From cis From0*n(M),
-        To cis To0*n(M).
-domain_expand_(split(S0, Left0, Right0), M, split(S, Left, Right)) :-
-        S is M*S0,
-        domain_expand_(Left0, M, Left),
-        domain_expand_(Right0, M, Right).
-
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   similar to domain_expand/3, tailored for truncated division: an
-   interval [From,To] is extended to [From*M, ((To+1)*M - 1)], i.e.,
-   to all values that truncated integer-divided by M yield a value
-   from interval.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-domain_expand_more(D0, M, D) :-
-        %format("expanding ~w by ~w\n", [D0,M]),
-        (   M < 0 -> domain_negate(D0, D1), M1 is abs(M)
-        ;   D1 = D0, M1 = M
+domain_includes(_, empty, true).
+domain_includes(D, from_to(L,F,T,R), Truth) :-
+    call(
+        (   domain_includes(D, L),
+            '@domain_includes'(D, F-T),
+            domain_includes(D, R)
         ),
-        domain_expand_more_(D1, M1, D).
-        %format("yield: ~w\n", [D]).
+        Truth
+    ).
 
-domain_expand_more_(empty, _, empty).
-domain_expand_more_(from_to(From0, To0), M, from_to(From,To)) :-
-        (   From0 cis_leq n(0) ->
-            From cis (From0-n(1))*n(M) + n(1)
-        ;   From cis From0*n(M)
+'@domain_includes'(empty, _, false).
+'@domain_includes'(from_to(L,I,S,R), F-T, Truth) :-
+    cis_compare(O0, F, S),
+    cis_compare(O1, T, I),
+    '@domain_includes'(O0, O1, from_to(L,I,S,R), F-T, Truth).
+
+'@domain_includes'(<, <, from_to(L,_,_,_), I, Truth) :-
+    '@domain_includes'(L, I, Truth).
+'@domain_includes'(<, >, from_to(_,I,S,_), F-T, Truth) :-
+    cis_compare(O0, F, I),
+    cis_compare(O1, T, S),
+    '@@domain_includes'(O0, O1, Truth).
+'@domain_includes'(<, =, from_to(_,I,S,_), F-T, Truth) :-
+    cis_compare(O0, F, I),
+    cis_compare(O1, T, S),
+    '@@domain_includes'(O0, O1, Truth).
+'@domain_includes'(=, >, from_to(_,I,S,_), F-T, Truth) :-
+    cis_compare(O0, F, I),
+    cis_compare(O1, T, S),
+    '@@domain_includes'(O0, O1, Truth).
+% '@domain_includes'(<, =, from_to(_,N,_,_), _-N, false).
+% '@domain_includes'(=, >, from_to(_,_,N,_), N-_, false).
+'@domain_includes'(=, =, from_to(_,N,N,_), N-N, true).
+'@domain_includes'(>, >, from_to(_,_,_,R), I, Truth) :-
+    '@domain_includes'(R, I, Truth).
+
+'@@domain_includes'(>, <, true).
+'@@domain_includes'(>, =, true).
+'@@domain_includes'(=, <, true).
+'@@domain_includes'(=, =, true).
+'@@domain_includes'(>, >, false).
+'@@domain_includes'(=, >, false).
+'@@domain_includes'(<, >, false).
+'@@domain_includes'(<, =, false).
+'@@domain_includes'(<, <, false).
+
+domain_intersects(D0, D1, Truth) :-
+    call(
+        ('@domain_intersects'(D0, D1) ; '@domain_intersects'(D1, D0)),
+        Truth
+    ).
+
+'@domain_intersects'(_, empty, false).
+'@domain_intersects'(D, from_to(L,F,T,R), Truth) :-
+    bound_finite(F, T0),
+    bound_finite(T, T1),
+    call(
+        (   '@domain_intersects'(D, L)
+        ;   '@@domain_intersects'(T0, T1, D, F, T)
+        ;   '@domain_intersects'(D, R)
         ),
-        (   To0 cis_lt n(0) ->
-            To cis To0*n(M)
-        ;   To cis (To0+n(1))*n(M) - n(1)
-        ).
-domain_expand_more_(split(S0, Left0, Right0), M, split(S, Left, Right)) :-
-        S is M*S0,
-        domain_expand_more_(Left0, M, Left),
-        domain_expand_more_(Right0, M, Right).
+        Truth
+    ).
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Scale a domain down by a constant multiplier. Assuming (//)/2.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+'@@domain_intersects'(false, false, D, inf, sup, Truth) :-
+    if_(domain_empty(D), Truth = false, Truth = true).
+'@@domain_intersects'(false,  true, D, inf, n(N), Truth) :-
+    % domain_infimum(D, I),
+    % domain_from_bounds(inf, n(N), D0),
+    % if_(bound_finite(I), (n(N0) = I, domain_contains(D0, N0)), Truth = true).
+    call(domain_contains(D, N), Truth).
+'@@domain_intersects'( true, false, D, n(N), sup, Truth) :-
+    call(domain_contains(D, N), Truth).
+'@@domain_intersects'( true,  true, D, n(N0), n(N1), Truth) :-
+    call((domain_contains(D, N0) ; domain_contains(D, N1)), Truth).
 
-domain_contract(D0, M, D) :-
-        %format("contracting ~w by ~w\n", [D0,M]),
-        (   M < 0 -> domain_negate(D0, D1), M1 is abs(M)
-        ;   D1 = D0, M1 = M
-        ),
-        domain_contract_(D1, M1, D).
+% Operations.
 
-domain_contract_(empty, _, empty).
-domain_contract_(from_to(From0, To0), M, from_to(From,To)) :-
-        (   From0 cis_geq n(0) ->
-            From cis (From0 + n(M) - n(1)) // n(M)
-        ;   From cis From0 // n(M)
-        ),
-        (   To0 cis_geq n(0) ->
-            To cis To0 // n(M)
-        ;   To cis (To0 - n(M) + n(1)) // n(M)
-        ).
-domain_contract_(split(_,Left0,Right0), M, D) :-
-        %  Scaled down domains do not necessarily retain any holes of
-        %  the original domain.
-        domain_contract_(Left0, M, Left),
-        domain_contract_(Right0, M, Right),
-        domains_union(Left, Right, D).
+% domain_remove(<(E), D0, D) :-
+%     domain_remove_greater_than(E, D0, D).
+% domain_remove(=(E), D0, D) :-
+%     domain_remove_number(E, D0, D).
+% domain_remove(>(E), D0, D) :-
+%     domain_remove_less_than(E, D0, D).
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Similar to domain_contract, tailored for division, i.e.,
-   {21,23} contracted by 4 is 5. It contracts "less".
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+% domain_remove_number(E, D0, D) :-
+domain_remove(E, D0, D) :-
+    if_(domain_contains(D0, E), '@domain_remove_number'(E, D0, D), D = D0).
 
-domain_contract_less(D0, M, D) :-
-        (   M < 0 -> domain_negate(D0, D1), M1 is abs(M)
-        ;   D1 = D0, M1 = M
-        ),
-        domain_contract_less_(D1, M1, D).
+'@domain_remove_number'(E, D0, D) :-
+    domain_to_intervals(D0, Is0),
+    intervals_diff([n(E)-n(E)], Is0, Is),
+    domain_from_intervals(Is, D).
 
-domain_contract_less_(empty, _, empty).
-domain_contract_less_(from_to(From0, To0), M, from_to(From,To)) :-
-        From cis From0 // n(M), To cis To0 // n(M).
-domain_contract_less_(split(_,Left0,Right0), M, D) :-
-        %  Scaled down domains do not necessarily retain any holes of
-        %  the original domain.
-        domain_contract_less_(Left0, M, Left),
-        domain_contract_less_(Right0, M, Right),
-        domains_union(Left, Right, D).
+domain_remove_less_than(I, D0, D) :-
+    domain_infimum(D0, I0),
+    cis_compare(O, I0, n(I)),
+    '@domain_remove_less_than'(O, I, D0, D).
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Negate the domain. Left and Right sub-domains and bounds switch sides.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+'@domain_remove_less_than'(<, I0, D0, D) :-
+    domain_to_intervals(D0, Is0),
+    integer_add(1, I, I0),
+    intervals_diff([inf-n(I)], Is0, Is),
+    domain_from_intervals(Is, D).
+'@domain_remove_less_than'(=, _, D, D).
+'@domain_remove_less_than'(>, _, D, D).
 
-domain_negate(empty, empty).
-domain_negate(from_to(From0, To0), from_to(From, To)) :-
-        From cis -To0, To cis -From0.
-domain_negate(split(S0, Left0, Right0), split(S, Left, Right)) :-
-        S is -S0,
-        domain_negate(Left0, Right),
-        domain_negate(Right0, Left).
+domain_remove_greater_than(S, D0, D) :-
+    domain_supremum(D0, S0),
+    cis_compare(O, S0, n(S)),
+    '@domain_remove_greater_than'(O, S, D0, D).
 
-/* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-   Construct a domain from a list of integers. Try to balance it.
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
+'@domain_remove_greater_than'(<, _, D, D).
+'@domain_remove_greater_than'(=, _, D, D).
+'@domain_remove_greater_than'(>, S0, D0, D) :-
+    domain_to_intervals(D0, Is0),
+    integer_add(1, S0, S),
+    intervals_diff([n(S)-sup], Is0, Is),
+    domain_from_intervals(Is, D).
 
-list_to_disjoint_intervals([], []).
-list_to_disjoint_intervals([N|Ns], Is) :-
-        list_to_disjoint_intervals(Ns, N, N, Is).
+domain_diff(S, D0, D) :-
+    % if_(domain_includes(D0, S), '@domain_diff'(S, D0, D), D = D0). % Wrong.
+    '@domain_diff'(S, D0, D).
 
-list_to_disjoint_intervals([], M, N, [n(M)-n(N)]).
-list_to_disjoint_intervals([B|Bs], M, N, Is) :-
-        (   B =:= N + 1 ->
-            list_to_disjoint_intervals(Bs, M, B, Is)
-        ;   Is = [n(M)-n(N)|Rest],
-            list_to_disjoint_intervals(Bs, B, B, Rest)
-        ).
+'@domain_diff'(S, D0, D) :-
+    domain_to_intervals(S, Is0),
+    domain_to_intervals(D0, Is1),
+    intervals_diff(Is0, Is1, Is),
+    domain_from_intervals(Is, D).
 
-list_to_domain(List0, D) :-
-        (   List0 == [] -> D = empty
-        ;   sort(List0, List),
-            list_to_disjoint_intervals(List, Is),
-            intervals_to_domain(Is, D)
-        ).
+domain_complement(D0, D) :-
+    domain_from_bounds(inf, sup, D1),
+    domain_diff(D0, D1, D).
 
-intervals_to_domain([], empty).
-intervals_to_domain([I|Is], D) :-
-        intervals_to_domain_(I, Is, D).
+% Geometry.
 
-intervals_to_domain_(I0, [], from_to(M,N)) :-
-        I0 = M-N.
-intervals_to_domain_(I0, [I1|Is0], D) :-
-        Is = [I0|[I1|Is0]],
-        length(Is, L),
-        FL is L // 2,
-        length(Front, FL),
-        append(Front, Tail, Is),
-        Tail = [n(Start)-_|_],
-        Hole is Start - 1,
-        intervals_to_domain(Front, Left),
-        intervals_to_domain(Tail, Right),
-        D = split(Hole, Left, Right).
+domain_congruent(empty, empty).
+domain_congruent(from_to(L0,_,_,R0), from_to(L,_,_,R)) :-
+    domain_congruent(L0, L),
+    domain_congruent(R0, R).
+
+domain_union(D0, D1, D) :-
+    domain_to_intervals(D0, Is0),
+    domain_to_intervals(D1, Is1),
+    intervals_union(Is0, Is1, Is),
+    domain_from_intervals(Is, D).
+
+domain_inter(D0, D1, D) :-
+    domain_to_intervals(D0, Is0),
+    domain_to_intervals(D1, Is1),
+    intervals_inter(Is0, Is1, Is),
+    domain_from_intervals(Is, D).
+
+domain_shift(N, D0, D) :-
+    integer_compare(O, 0, N),
+    '@domain_shift'(O, N, D0, D).
+
+'@domain_shift'(<, N, D0, D) :-
+    '@domain_shift'(N, D0, D).
+'@domain_shift'(=, 0, D, D).
+'@domain_shift'(>, N, D0, D) :-
+    '@domain_shift'(N, D0, D).
+
+'@domain_shift'(_, empty, empty).
+'@domain_shift'(N, from_to(L0,F0,T0,R0), from_to(L,F,T,R)) :-
+    '@domain_shift'(N, L0, L),
+    F cis F0+n(N),
+    T cis T0+n(N),
+    '@domain_shift'(N, R0, R).
+
+domain_expand(A, D0, D) :-
+    compare(O, 0, A),
+    '@domain_expand'(O, A, D0, D).
+
+'@domain_expand'(<, A, D0, D) :- '@domain_positive_expand'(A, D0, D).
+'@domain_expand'(=, 0, D0, D) :- '@domain_zero_expand'(D0, D).
+'@domain_expand'(>, A, D0, D) :- '@domain_negative_expand'(A, D0, D).
+
+'@domain_positive_expand'(A, D0, D) :-
+    compare(O, 1, A),
+    '@domain_positive_expand'(O, A, D0, D).
+
+'@domain_positive_expand'(=, 1, D, D).
+'@domain_positive_expand'(<, A, D0, D) :-
+    '@@domain_positive_expand'(A, D0, D).
+
+'@@domain_positive_expand'(_, empty, empty).
+'@@domain_positive_expand'(A, from_to(L0,F0,T0,R0), from_to(L,F,T,R)) :-
+    '@@domain_positive_expand'(A, L0, L),
+    F cis n(A)*F0,
+    T cis n(A)*T0,
+    '@@domain_positive_expand'(A, R0, R).
+
+'@domain_zero_expand'(empty, empty).
+'@domain_zero_expand'(from_to(_,_,_,_), from_to(empty,n(0),n(0),empty)).
+
+'@domain_negative_expand'(A, D0, D) :-
+    domain_to_intervals(D0, Is0),
+    phrase('@intervals_negative_expand'(A, Is0), Is),
+    domain_congruent(D0, D),
+    domain_to_intervals(D, Is).
+
+domain_contract(A, D0, D) :-
+    domain_to_intervals(D0, Is0),
+    intervals_contract(A, Is0, Is),
+    domain_from_intervals(Is, D).
+%     compare(O, 0, A),
+%     '@domain_contract'(O, A, D0, D).
+% 
+% '@domain_contract'(<, A, D0, D) :-
+%     domain_to_intervals(D0, Is0),
+%     intervals_contract(A, Is0, Is),
+%     domain_from_intervals(Is, D).
+% '@domain_contract'(>, A, D0, D) :-
+%     domain_to_intervals(D0, Is0),
+%     intervals_contract(A, Is0, Is),
+%     domain_from_intervals(Is, D).
+
+domain_shrink(A, D0, D) :-
+    domain_to_intervals(D0, Is0),
+    intervals_shrink(A, Is0, Is),
+    domain_from_intervals(Is, D).
+
+% Intervals.
+domain_to_intervals(D, Is) :-
+    phrase('@domain_intervals'(D), Is).
+
+'@domain_intervals'(empty) --> [].
+'@domain_intervals'(from_to(L,F,T,R)) -->
+    '@domain_intervals'(L), [F-T], '@domain_intervals'(R).
+
+domain_from_intervals([], empty).
+domain_from_intervals([I0|Is0], from_to(L,F,T,R)) :-
+    Is = [I0|Is0],
+    list_length(Is, N),
+    Mid is N div 2,
+    list_length(Is1, Mid),
+    list_append(Is1, [F-T|Is2], Is),
+    domain_from_intervals(Is1, L),
+    domain_from_intervals(Is2, R).
+
+domain_from_numbers(Ns, D) :-
+    intervals_from_numbers(Ns, Is),
+    domain_from_intervals(Is, D).
+
+domain_to_numbers(D, _) :-
+    domain_diameter(D, sup),
+    throw(error(instantiation_error,domain_to_numbers/2)).
+domain_to_numbers(D, Ns) :-
+    phrase(domain_to_numbers(D), Ns).
+
+domain_to_numbers(empty) --> [].
+domain_to_numbers(from_to(L,F,T,R)) -->
+    domain_to_numbers(L), '@interval_to_numbers'(F-T), domain_to_numbers(R).
+
+domain_boundary(empty) --> [].
+domain_boundary(from_to(L,F,T,R)) -->
+    domain_boundary(L), [F,T], domain_boundary(R).
+
+
+% domain_spread(Dom, Spread) :-
+%         domain_smallest_finite(Dom, S),
+%         domain_largest_finite(Dom, L),
+%         Spread cis L - S, portray_clause(user_error, domain_spread(Spread)).
+% 
+% smallest_finite(inf, Y, Y).
+% smallest_finite(n(N), _, n(N)).
+% 
+% domain_smallest_finite(empty, inf).
+% domain_smallest_finite(from_to(L,F,T,_), I) :-
+%     domain_smallest_finite(L, I0),
+%     smallest_finite(F, T, I1),
+%     I cis max(I0,I1).
+% 
+% largest_finite(sup, Y, Y).
+% largest_finite(n(N), _, n(N)).
+% 
+% domain_largest_finite(empty, sup).
+% domain_largest_finite(from_to(_,F,T,R), S) :-
+%     domain_largest_finite(R, S0),
+%     largest_finite(T, F, S1),
+%     S cis min(S0,S1).
