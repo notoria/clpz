@@ -31,8 +31,10 @@ distinct_attach([X|Xs], Prop, Right) -->
 
 difference_arcs(Vars, FreeLeft, FreeRight) :-
         empty_assoc(E),
+        % avlt_empty(E),
         phrase(difference_arcs(Vars, FreeLeft), [E], [NumVar]),
         assoc_to_list(NumVar, LsNumVar),
+        % avlt_list(in, lr, entry, NumVar, LsNumVar),
         pairs_values(LsNumVar, FreeRight).
 
 difference_arcs([], []) --> [].
@@ -62,6 +64,11 @@ enumerate([N|Ns], V) -->
           ;   put_assoc(N, NumVar0, Y, NumVar),
               put_attr(Y, value, N)
           ),
+          % if_(avlt_member(NumVar0, N),
+          %     NumVar = NumVar0,
+          %     (avlt_insert(N, Y, NumVar0, NumVar), put_attr(Y, value, N))
+          % ),
+          % avlt_search(NumVar, N, Y),
           put_attr(F, flow, 0),
           must_succeed(append_edge(Y, edges, flow_from(F,V))),
           must_succeed(append_edge(V, edges, flow_to(F,Y))) },
@@ -296,7 +303,7 @@ vlowlink_is_index(V) -->
 
 index_plus_one -->
         state(s(I,Stack,Succ), s(I1,Stack,Succ)),
-        { I1 is I+1 }.
+        { integer_add(1, I, I1) }. % I1 #= I+1
 
 s_push(V)  -->
         state(s(I,Stack,Succ), s(I,[V|Stack],Succ)),
@@ -305,7 +312,7 @@ s_push(V)  -->
 vlowlink_min_lowlink(V, VP) -->
         { get_attr(V, lowlink, VL),
           get_attr(VP, lowlink, VPL),
-          VL1 is min(VL, VPL),
+          integer_min(VL, VPL, VL1), % VL1 #= min(VL,VPL),
           put_attr(V, lowlink, VL1) }.
 
 successors(V, Tos) --> state(s(_,_,Succ)), { call(Succ, V, Tos) }.
@@ -395,7 +402,7 @@ num_infinite(Var, N0, N) :-
             (   domain_infimum(Dom, n(_)),
                 domain_supremum(Dom, n(_))
             ->  N = N0
-            ;   integer_add(1, N0, N) % #N #= #N0 + #1
+            ;   integer_add(1, N0, N) % N #= N0+1
             )
         ;   integer(Var),
             N = N0
@@ -489,7 +496,7 @@ num_subsets([], _Dom, Num, Num, []).
 num_subsets([S|Ss], Dom, Num0, Num, NonSubs) :-
         (   fd_get(S, SDom, _) ->
             (   domain_subdomain(Dom, SDom) ->
-                Num1 is Num0 + 1,
+                integer_add(1, Num0, Num1), % Num1 #= Num0+1,
                 num_subsets(Ss, Dom, Num1, Num, NonSubs)
             ;   NonSubs = [S|Rest],
                 num_subsets(Ss, Dom, Num0, Num, Rest)

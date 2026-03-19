@@ -84,8 +84,7 @@ divide(D, N, Q) :-
 '@scalar_product'(#=, Cs0, Vs, S0) :-
     (   Cs0 = [C|Rest] ->
         list_foldl(integer_gcd, Rest, C, GCD),
-        % gcd(Rest, C, GCD),
-        S0 mod GCD =:= 0,
+        integer_ddqr(floor, S0, GCD, _, 0),
         list_map(divide(GCD), [S0|Cs0], [S|Cs])
     ;   S0 =:= 0, S = S0, Cs = Cs0
     ),

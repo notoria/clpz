@@ -161,7 +161,7 @@ label(Vars, Selection, Order, Choice, Consistency) :-
             (   var(Var) ->
                 (   Consistency = upto_in(I0,I), fd_get(Var, _, Ps), propagators_dead(Ps) ->
                     fd_size(Var, Size),
-                    I1 is I0*Size,
+                    integer_mul(Size, I0, I1), % I1 #= I0*Size,
                     label(RVars, Selection, Order, Choice, upto_in(I1,I))
                 ;   Consistency = upto_in, fd_get(Var, _, Ps), propagators_dead(Ps) ->
                     label(RVars, Selection, Order, Choice, Consistency)
@@ -187,8 +187,8 @@ choice_order_variable(bisect, Order, Var, _, Vars0, Selection, Consistency) :-
         fd_get(Var, Dom, _),
         domain_infimum(Dom, n(I)),
         domain_supremum(Dom, n(S)),
-        Mid0 is (I + S) // 2,
-        (   Mid0 =:= S -> Mid is Mid0 - 1 ; Mid = Mid0 ),
+        integer_add(I, S, R0), integer_ddqr(trunc, R0, 2, Mid0, _), % Mid0 #= (I + S) // 2,
+        (   Mid0 =:= S -> integer_add(1, Mid, Mid0) /* Mid #= Mid0 - 1 */ ; Mid = Mid0 ),
         (   Order == up -> ( #Var #=< Mid ; #Var #> Mid )
         ;   Order == down -> ( #Var #> Mid ; #Var #=< Mid )
         ;   domain_error(bisect_up_or_down, Order)

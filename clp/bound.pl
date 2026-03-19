@@ -8,7 +8,10 @@
 
 bound(inf).
 bound(n(N)) :-
-    integer(N).
+    (   var(N),
+        throw(error(instantiation_error,bound/1))
+    ;   integer(N)
+    ).
 bound(sup).
 
 bound_from_defaulty(D, _) :-

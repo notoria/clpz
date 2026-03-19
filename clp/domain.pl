@@ -89,8 +89,9 @@ domain_up_element(from_to(_,_,_,R), E) :-
 domain_down_element(from_to(_,_,_,R), E) :-
     domain_down_element(R, E).
 domain_down_element(from_to(_,n(F),n(T),_), E) :-
+    integer_add(T, F, R0),
     integer_between(F, T, E0),
-    E is T-(E0-F).
+    integer_add(R0, E, E0). % E #= T-(E0-F).
 domain_down_element(from_to(L,_,_,_), E) :-
     domain_down_element(L, E).
 
@@ -373,7 +374,7 @@ domain_from_intervals([], empty).
 domain_from_intervals([I0|Is0], from_to(L,F,T,R)) :-
     Is = [I0|Is0],
     list_length(Is, N),
-    Mid is N div 2,
+    integer_ddqr(floor, N, 2, Mid, _), % Mid #= N div 2,
     list_length(Is1, Mid),
     list_append(Is1, [F-T|Is2], Is),
     domain_from_intervals(Is1, L),

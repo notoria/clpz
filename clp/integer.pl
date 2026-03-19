@@ -37,9 +37,9 @@ integer_compare(O, A, B) :-
     integer(B),
     compare(O, A, B).
 
-'@integer_compare'(<, A, B, A, B).
-'@integer_compare'(=, A, A, A, A).
 '@integer_compare'(>, A, B, B, A).
+'@integer_compare'(=, A, A, A, A).
+'@integer_compare'(<, A, B, A, B).
 
 integer_compare(O, A0, B0, A, B) :-
     integer_compare(O, A0, B0),
@@ -107,6 +107,12 @@ integer_lt(A, B, Truth) :-
 integer_gt(A, B, Truth) :-
     integer_lt(B, A, Truth).
 
+% integer_between(L, U, I) :-
+%     member(T, [L,U,I]),
+%     nonvar(T),
+%     \+ integer(T),
+%     !,
+%     false.
 integer_between(L, U, _) :-
     var(L),
     var(U),
@@ -367,6 +373,10 @@ integer_ddqr(M, A, B, C, D) :-
 '@integer_ddqr'( ceil, A, B, C, D) :-
     C is -(-A div B),
     D is A-B*C.
+'@integer_ddqr'(trunc, A, B, C, D) :-
+    S is sign(A)*sign(B),
+    C is S*(abs(A) div abs(B)),
+    D is A-B*C.
 '@integer_ddqr'(floor, A, B, C, D) :-
     C is A div B,
     D is A mod B.
@@ -393,7 +403,8 @@ integer_exp(A, B, C) :-
     '@integer_exp'(A, B, C).
 
 '@integer_exp'(A, B, C) :-
-    catch(C is A^B, _, false).
+    (abs(A) =:= 1 -> true ; 0 @=< B),
+    C is A^B.
 
 % integer_gcd(A, B, C) :-
 %     member(D, [A,B,C]),
@@ -488,6 +499,7 @@ integer_nrt(M, A, B, C) :-
     B @>= 0,
     once('@integer_nrt'(M, A, B, C)).
 
+% C ^ A #= B
 '@integer_nrt'( ceil, A, B, C) :-
     (   % '@integer_ddqr'(ceil, B, 2, Z0, _),
         % Zs = [Z0|_],
@@ -522,7 +534,7 @@ integer_nrt(M, A, B, C) :-
 '@@integer_nrt'(N, A, X0, X) :-
     % X #= ((N-1)*X0^N+A)div(N*X0^(N-1))
     '@integer_add'(1, N0, N),
-    '@integer_exp'(X0,  N,  XN),
+    '@integer_exp'(X0,  N, XN),
     '@integer_mul'(N0, XN, X1),
     '@integer_add'(A, X1, X2),
     '@integer_exp'(X0, N0, XN0),
@@ -566,6 +578,7 @@ integer_log(M, A, B, C) :-
     B @> 0,
     once('@integer_log'(M, A, B, C)).
 
+% A ^ C #= B
 '@integer_log'( ceil, A, B, C) :-
     (   '@integer_msb'(A, Z0),
         '@integer_add'(1, Z0, Z1),
@@ -603,7 +616,7 @@ integer_shl(A, B, C) :-
     '@integer_shl'(A, B, C).
 
 '@integer_shl'(A, B, C) :-
-    C is B << A.
+    C is B<<A.
 
 % integer_shr(A, B, C) :-
 %     member(D, [A,B,C]),
@@ -621,7 +634,7 @@ integer_shr(A, B, C) :-
     '@integer_shr'(A, B, C).
 
 '@integer_shr'(A, B, C) :-
-    C is B >> A.
+    C is B>>A.
 
 % integer_xor(A, B, C) :-
 %     member(D, [A,B,C]),

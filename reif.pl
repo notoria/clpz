@@ -4,8 +4,8 @@
 
 if_(Test_1, Then_0, Else_0) :-
     call(Test_1, T),
-    (   var(T)
-    ->  throw(error(instantiation_error,if_/2))
+    (   var(T),
+        throw(error(instantiation_error,if_/2))
     ;   T == true
     ->  call(Then_0)
     ;   T == false

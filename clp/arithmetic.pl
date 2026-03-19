@@ -25,8 +25,8 @@ armt_from_term(T, E) :-
 
 '@armt_from_term'(T, E) :-
     (   var(T)
-    ->  (   monotonic
-        ->  throw(error(instantiation_error,_))
+    ->  (   monotonic,
+            throw(error(instantiation_error,_))
         ;   E = #T
         )
     ;   integer(T)

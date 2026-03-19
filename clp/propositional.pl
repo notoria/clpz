@@ -15,8 +15,8 @@ pfml_from_term(T, E) :-
 
 '@pfml_from_term'(T, E) :-
     (   var(T)
-    ->  (   monotonic
-        ->  throw(error(instantiation_error,_))
+    ->  (   monotonic,
+            throw(error(instantiation_error,_))
         ;   E = #T
         )
     ;   integer(T)
@@ -123,8 +123,8 @@ pfml_constrain(#B, B) -->
     { B in 0..1 }.
 pfml_constrain(V in D0, B) -->
     {   drep_to_domain(D0, D),
-        V in inf..sup, % '@in'(inf..sup, V),
-        B in 0..1, % '@in'(0..1, B),
+        V in inf..sup,
+        B in 0..1,
         propagator_from_constraint(bin(D,V,B), P),
         term_variables([V,B], Vs),
         propagator_trigger(P, Vs)
@@ -183,7 +183,8 @@ pfml_constrain(E0 #= E1, B) -->
 pfml_constrain(E0 #\= E1, B) -->
     pfml_arithmetic(bne, E0, E1, B).
 
-pfml_negate(V in D, #\ V in D).
+pfml_negate(V in D0, V in D) :-
+    domain_complement(D0, D).
 pfml_negate(#B, #\ #B).
 pfml_negate(#\E, E).
 pfml_negate(E0 #/\ E1, E2 #\/ E3) :-

@@ -12,31 +12,6 @@
 :- include("../error").
 :- include("../freeze").
 
-between(L, _, _) :-
-    var(L),
-    throw(error(instantiation_error,between/3)).
-between(_, U, _) :-
-    var(U),
-    throw(error(instantiation_error,between/3)).
-between(L, U, N) :-
-    integer(L),
-    integer(U),
-    (   var(N)
-    ->  L @=< U,
-        '@between'(L, U, N)
-    ;   integer(N),
-        L @=< N,
-        N @=< U
-    ).
-
-'@between'(L, U, N) :-
-    (   L = U
-    ->  U = N
-    ;   L = N
-    ;   M is L+1,
-        '@between'(M, U, N)
-    ).
-
 member(E, Es) :-
     list_element(Es, E).
 

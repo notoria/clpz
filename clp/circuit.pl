@@ -33,9 +33,9 @@ circuit(Vs) :-
     ).
 
 neq_index([], _).
-neq_index([X|Xs], N) :-
-        neq_num(X, N),
-        N1 is N + 1,
+neq_index([X|Xs], N0) :-
+        neq_num(X, N0),
+        integer_add(1, N0, N1), % N1 #= N0 + 1,
         neq_index(Xs, N1).
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

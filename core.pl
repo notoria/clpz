@@ -22,19 +22,19 @@ copy_term_nat(T0, T) :-
 % copy_term(T0, T) :-
 %     findall(T0, true, [T]).
 
+'@term_compare'(>, X, Y, Y, X).
+'@term_compare'(=, X, X, X, X).
+'@term_compare'(<, X, Y, X, Y).
+
 term_compare(R, X0, Y0, X, Y) :-
     term_compare(R, X0, Y0),
     '@term_compare'(R, X0, Y0, X, Y).
 
-'@term_compare'(<, X, Y, X, Y).
-'@term_compare'(=, X, Y, X, Y).
-'@term_compare'(>, X, Y, Y, X).
-
-element([E|Es], E0) :-
-    '@element'(Es, E, E0).
-
 '@element'(_, E, E).
 '@element'([E|Es], _, E0) :-
+    '@element'(Es, E, E0).
+
+element([E|Es], E0) :-
     '@element'(Es, E, E0).
 
 expand_term(T0, T) :-

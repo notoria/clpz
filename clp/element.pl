@@ -36,5 +36,5 @@ integers_remaining([V|Vs], N0, Dom, D0, D) :-
             domain_union(D0, VD, D1)
         ;   D1 = D0
         ),
-        N1 is N0 + 1,
+        integer_add(1, N0, N1), % N1 #= N0+1,
         integers_remaining(Vs, N1, Dom, D1, D).

@@ -32,8 +32,8 @@ duophrase(NT, As, Bs) :-
 
 duophrase(NT, As0, As, Bs0, Bs) :-
     % call(NT, As0, As, Bs0, Bs).
-    (   var(NT)
-    ->  throw(error(instantiation_error,duophrase/5))
+    (   var(NT),
+        throw(error(instantiation_error,duophrase/5))
     ;   duodcg_constr(NT),
         catch(
             duodcg_cbody(NT, G, As0, As, Bs0, Bs),

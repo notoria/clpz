@@ -1247,13 +1247,11 @@ propagate_iadd(MState, X, Y, Z) -->
         YD,
         YUL
     ),
-    if_(
-        bound_finite(YLU),
+    if_(bound_finite(YLU),
         interval_factor(ZL-ZU, YL-YLU, XIs1),
         XIs1 = []
     ),
-    if_(
-        bound_finite(YUL),
+    if_(bound_finite(YUL),
         interval_factor(ZL-ZU, YUL-YU, XIs2),
         XIs2 = []
     ),
@@ -1279,13 +1277,11 @@ propagate_iadd(MState, X, Y, Z) -->
         ZD,
         ZUL
     ),
-    if_(
-        bound_finite(ZLU),
+    if_(bound_finite(ZLU),
         interval_factor(ZL-ZLU, YL-YU, XIs1),
         XIs1 = []
     ),
-    if_(
-        bound_finite(ZUL),
+    if_(bound_finite(ZUL),
         interval_factor(ZUL-ZU, YL-YU, XIs2),
         XIs2 = []
     ),
@@ -1411,8 +1407,7 @@ propagate_imul0_z(MState, X, Y, Z) -->
                 ZU cis max(max(XL*YL,XL*YU),max(XU*YL,XU*YU)),
                 domain_from_bounds(ZL, ZU, ZD1),
                 domain_inter(ZD1, ZD0, ZD2),
-                if_(
-                    (domain_contains(XD, 0) ; domain_contains(YD, 0)),
+                if_((domain_contains(XD, 0) ; domain_contains(YD, 0)),
                     ZD = ZD2,
                     domain_remove(0, ZD2, ZD)
                 )
@@ -1449,13 +1444,11 @@ propagate_imul0(MState, X, Y, Z) -->
             YD,
             YUL
         ),
-        if_(
-            bound_finite(YLU),
+        if_(bound_finite(YLU),
             interval_factor(n(Z)-n(Z), YL-YLU, XIs0),
             XIs0 = []
         ),
-        if_(
-            bound_finite(YUL),
+        if_(bound_finite(YUL),
             interval_factor(n(Z)-n(Z), YUL-YU, XIs1),
             XIs1 = []
         ),
@@ -1587,6 +1580,10 @@ propagate_imul1_z(MState, X, Y, Z) -->
     },
     '@propagate_imul1_x_positive'(O0, O1, YPs, Y, Z).
 
+'@propagate_imul1_x_eq'(false, MState, X) -->
+    { kill(MState), X = 1 }.
+'@propagate_imul1_x_eq'( true, _, _) --> [].
+
 % No update to X
 propagate_imul1_x(MState, X, Y, Z) -->
     (   { X == 0 }
@@ -1600,8 +1597,10 @@ propagate_imul1_x(MState, X, Y, Z) -->
         queue_pgoal(#Z + #Y #= #0)
     ;   { Y == Z }
     ->  {   fd_get(Z, ZD, _),
-            if_(domain_contains(ZD, 0), true, (kill(MState), X = 1))
-        }
+            domain_contains(ZD, 0, Truth)
+            % if_(domain_contains(ZD, 0), true, (kill(MState), X = 1))
+        },
+        '@propagate_imul1_x_eq'(Truth, MState, X)
     ;   % { integer_compare(O, 0, X) },
         % '@propagate_imul1_x'(O, Y, Z),
         (   { var(Z), var(Y) }
@@ -1618,8 +1617,7 @@ propagate_imul1_x(MState, X, Y, Z) -->
                 fd_get(Z, ZD_, _),
                 domain_shrink(X, ZD_, YD1),
                 domain_inter(YD1, YD0, YD2),
-                if_(
-                    domain_contains(ZD_, 0),
+                if_(domain_contains(ZD_, 0),
                     YD = YD2,
                     domain_remove(0, YD2, YD)
                 )
@@ -2797,14 +2795,12 @@ propagate_imod2_x(>, X, Y, Z) -->
     {
         fd_get(X, XD0, XPs),
         domain_infimum(XD0, XL0),
-        if_(
-            bound_finite(XL0),
+        if_(bound_finite(XL0),
             XL cis n(Z)+  ( (XL0-n(Z)) div n(Y))*n(Y),
             XL = XL0
         ),
         domain_supremum(XD0, XU0),
-        if_(
-            bound_finite(XU0),
+        if_(bound_finite(XU0),
             XU cis n(Z)+ -(-(XU0-n(Z)) div n(Y))*n(Y),
             XU = XU0
         ),
@@ -2820,14 +2816,12 @@ propagate_imod2_x(<, X, Y, Z) -->
     {
         fd_get(X, XD0, XPs),
         domain_infimum(XD0, XL0),
-        if_(
-            bound_finite(XL0),
+        if_(bound_finite(XL0),
             XL cis n(Z)+ -(-(XL0-n(Z)) div n(Y))*n(Y),
             XL = XL0
         ),
         domain_supremum(XD0, XU0),
-        if_(
-            bound_finite(XU0),
+        if_(bound_finite(XU0),
             XU cis n(Z)+  ( (XU0-n(Z)) div n(Y))*n(Y),
             XU = XU0
         ),
@@ -3462,8 +3456,7 @@ propagate_imsb0(_, X, Y) -->
             fd_get(Y, YD0, YPs),
             cis_compare(O, n(1), XL),
             '@propagate_imsb0'(O, YD0, YD)
-            % if_(
-            %     cis_lt(n(1), XL),
+            % if_(cis_lt(n(1), XL),
             %     domain_remove_less_than(0, YD0, YD),
             %     YD = YD0
             % )
@@ -3532,8 +3525,7 @@ propagate_ict10(MState, X, Y) -->
                 '@propagate_ict10_inf'(O, YD0, YD1),
                 domain_supremum(XD, XU),
                 '@propagate_ict10_sup'(XU, YD1, YD)
-                % if_(
-                %     bound_finite(XU),
+                % if_(bound_finite(XU),
                 %     '@propagate_ict10'(XU, YD0, YD),
                 %     YD = YD0
                 % )
@@ -3577,20 +3569,32 @@ propagate_ict1(MState, X, Y) -->
 % Properties:
 %   V in D #<==> #B.
 
+'@propagate_bin0_intersects'(false, MState, _, _, B) -->
+    { kill(MState) },
+    queue_pgoal(B = 0).
+'@propagate_bin0_intersects'( true, _, _, _, _) --> [].
+
+'@propagate_bin0_includes'(false, MState, D, V, B) -->
+    { fd_get(V, VD, _), domain_intersects(D, VD, Truth) },
+    '@propagate_bin0_intersects'(Truth, MState, D, V, B).
+'@propagate_bin0_includes'( true, MState, _, _, B) -->
+    { kill(MState) },
+    queue_pgoal(B = 1).
+
 propagate_bin0(MState, D, V, B) -->
     (   { var(V), var(B) }
-    ->  {   fd_get(V, VD, _),
-            if_(
-                domain_includes(D, VD),
-                (kill(MState), G = (B = 1)),
-                if_(
-                    domain_intersects(D, VD),
-                    G = true,
-                    (kill(MState), G = (B = 0))
-                )
-            )
-        },
-        queue_pgoal(G)
+    ->  { fd_get(V, VD, _), domain_includes(D, VD, Truth) },
+        '@propagate_bin0_includes'(Truth, MState, D, V, B)
+    % ->  {   fd_get(V, VD, _),
+    %         if_(domain_includes(D, VD),
+    %             (kill(MState), G = (B = 1)),
+    %             if_(domain_intersects(D, VD),
+    %                 G = true,
+    %                 (kill(MState), G = (B = 0))
+    %             )
+    %         )
+    %     },
+    %     queue_pgoal(G)
     ;   []
     ).
 
@@ -4083,6 +4087,13 @@ propagate_bne0(MState, B, X, Y) -->
     ->  (   { X == Y }
         ->  { kill(MState) },
             queue_pgoal(B = 0)
+        % Interesting but more research is needed.
+        % ;   {   fd_get(X, _, XPs),
+        %         list_element([pneq(X,Y),pneq(Y,X)], C),
+        %         propagators_constraint(XPs, C0), C0 == C
+        %     }
+        % ->  { kill(MState) },
+        %     queue_pgoal(B = 1)
         ;   {   fd_get(X, XD, _),
                 fd_get(Y, YD, _),
                 domain_intersects(XD, YD, Truth)
@@ -4952,8 +4963,7 @@ propagate_bmod3_x(1, X, Y, Z) -->
 
 % Update to Y
 propagate_bmod3_y(MState, 0, X, _, Z) -->
-    {   if_(
-            (   integer_le(0, X), integer_lt(X, Z)
+    {   if_((   integer_le(0, X), integer_lt(X, Z)
             ;   integer_ge(0, X), integer_gt(X, Z)
             ),
             kill(MState),

@@ -66,8 +66,3 @@ filter_linsum([C0|Cs0], [V0|Vs0], Cs, Vs) :-
     ;   Cs = [C0|Cs1], Vs = [V0|Vs1],
         filter_linsum(Cs0, Vs0, Cs1, Vs1)
     ).
-
-% gcd([], G, G).
-% gcd([N|Ns], G0, G) :-
-%     G1 is gcd(N, G0),
-%     gcd(Ns, G1, G).

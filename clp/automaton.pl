@@ -193,14 +193,14 @@ arcs_relation([arc(S0,L,S1,Es)|As], [[From,L,To|Ns]|Rs]) -->
 exprs_nums([], [], [], []).
 exprs_nums([E|Es], [N|Ns], [Ex0-C0|Exs0], [Ex-C|Exs]) :-
         (   member(Exp-N, Ex0), Exp == E -> C = C0, Ex = Ex0
-        ;   N = C0, C is C0 + 1, Ex = [E-C0|Ex0]
+        ;   N = C0, integer_add(1, C0, C), Ex = [E-C0|Ex0]
         ),
         exprs_nums(Es, Ns, Exs0, Exs).
 
 node_num(Node, Num) -->
         state(s(Nodes0-C0, Exprs), s(Nodes-C, Exprs)),
         { (   member(N-Num, Nodes0), N == Node -> C = C0, Nodes = Nodes0
-          ;   Num = C0, C is C0 + 1, Nodes = [Node-C0|Nodes0]
+          ;   Num = C0, integer_add(1, C0, C), Nodes = [Node-C0|Nodes0]
           )
         }.
 

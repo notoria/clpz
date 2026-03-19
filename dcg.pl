@@ -2,8 +2,8 @@ phrase(NT, S0) :-
     phrase(NT, S0, []).
 
 phrase(NT, S0, S) :-
-    (   var(NT)
-    ->  throw(error(instantiation_error,phrase/3))
+    (   var(NT),
+        throw(error(instantiation_error,phrase/3))
     ;   dcg_constr(NT),
         catch(dcg_body(NT, S0, S, G), error(E,_), throw(error(E,phrase/3)))
         % dcg_body(NT, S0, S, G)
