@@ -14,6 +14,8 @@ constraint_wake(x_leq_y_plus_c, bounds).
 constraint_wake(scalar_product_eq, bounds).
 constraint_wake(scalar_product_leq, bounds).
 constraint_wake(iadd, bounds).
+constraint_wake(imin, bounds).
+constraint_wake(imax, bounds).
 constraint_wake(pleq, bounds).
 constraint_wake(pgcc_single, bounds).
 constraint_wake(pgcc_check_single, bounds).

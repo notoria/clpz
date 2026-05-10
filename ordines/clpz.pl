@@ -2359,7 +2359,7 @@ nvalue(N, Vars) :-
         propagator_init_trigger(Vars, pnvalue(N, Vars)).
 
 zero_or_more([], 0).
-zero_or_more([_|_], N) :- N #> 0.
+zero_or_more([_|_], N) :- #N #> 0.
 
 %% sum(+Vars, +Rel, ?Expr)
 %
@@ -2673,9 +2673,9 @@ parse_clpz(E, R,
              m(sign(A))        => [g(R in -1..1), p(psign(A, R))],
              % bitwise operations
              m(\A)             => [p(pfunction(\, A, R))],
-             m(msb(A))         => [p(pfunction(msb, A, R))],
-             m(lsb(A))         => [p(pfunction(lsb, A, R))],
-             m(popcount(A))    => [p(pfunction(popcount, A, R))],
+             m(msb(A))         => [g(A in 1..sup),g(R in 0..sup),p(pfunction(msb, A, R))],
+             m(lsb(A))         => [g(A in 1..sup),g(R in 0..sup),p(pfunction(lsb, A, R))],
+             m(popcount(A))    => [g(A in 0..sup),g(R in 0..sup),p(pfunction(popcount, A, R))],
              m(A<<B)           => [p(pfunction(<<, A, B, R))],
              m(A>>B)           => [p(pfunction(>>, A, B, R))],
              m(A/\B)           => [p(pfunction(/\, A, B, R))],
@@ -2955,8 +2955,8 @@ sort_by_predicate(Clauses, ByPred) :-
 predname(T, Key) :-
     (   T = (H:-_)
     ->  predname(H, Key)
-    ;   T = M:H, M:Key
-    ->  predname(H, Key)
+    ;   T = M:H, Key = M:K
+    ->  predname(H, K)
     ;   Key = Name/Arity
     ->  functor(T, Name, Arity)
     ).
@@ -6363,7 +6363,7 @@ with_local_attributes(Vars, Goal, Result) :-
                % we made during propagation, and unify the variables
                % in the thrown copy with Vars in order to get the
                % intended variables in Result.
-               copy_term_nat(Vars-Result, Copy),
+               copy_term(Vars-Result, Copy),
                throw(local_attributes(Copy))),
               local_attributes(Vars-Result),
               true).
@@ -6540,7 +6540,7 @@ maximal_matching([FL|FLs]) -->
 
 propagate_nvalue(N, Vars0) :-
         sort(Vars0, Vars),
-        include(integer, Vars, Ints),
+        include(nonvar, Vars, Ints),
         length(Ints, Distinct),
         vars_num_infinite(Vars, NumInfinite),
         N #>= Distinct,
@@ -6556,7 +6556,7 @@ vars_num_infinite(Vars, Num) :-
         foldl(num_infinite, Vars, 0, Num).
 
 num_infinite(Var, N0, N) :-
-        (   integer(Var) -> N = N0
+        (   nonvar(Var), integer(Var) -> N = N0
         ;   fd_get(Var, Dom, _),
             (   domain_infimum(Dom, n(_)),
                 domain_supremum(Dom, n(_)) -> N = N0

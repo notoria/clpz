@@ -2344,7 +2344,7 @@ nvalue(N, Vars) :-
         propagator_init_trigger(Vars, pnvalue(N, Vars)).
 
 zero_or_more([], 0).
-zero_or_more([_|_], N) :- N #> 0.
+zero_or_more([_|_], N) :- #N #> 0.
 
 %% sum(+Vars, +Rel, ?Expr)
 %
@@ -2389,9 +2389,9 @@ scalar_product(Cs, Vs, Op, Value) :-
             )
         ).
 
-single_value(V, T)    :- var(V), !, non_monotonic(V), T = V.
-single_value(I, T)    :- integer(I), T = I.
-single_value(?(V), T) :- fd_variable(V), T = V.
+single_value(T, V)    :- var(T), !, non_monotonic(T), V = T.
+single_value(T, I)    :- integer(T), I = T.
+single_value(?(V0), V) :- fd_variable(V0), V = V0.
 
 coeff_var_plusterm(C, V, T0, T0+(C* #V)).
 
@@ -2658,9 +2658,9 @@ parse_clpz(E, R,
              m(sign(A))        => [g(R in -1..1), p(psign(A, R))],
              % bitwise operations
              m(\A)             => [p(pfunction(\, A, R))],
-             m(msb(A))         => [p(pfunction(msb, A, R))],
-             m(lsb(A))         => [p(pfunction(lsb, A, R))],
-             m(popcount(A))    => [p(pfunction(popcount, A, R))],
+             m(msb(A))         => [g(A in 1..sup),g(R in 0..sup),p(pfunction(msb, A, R))],
+             m(lsb(A))         => [g(A in 1..sup),g(R in 0..sup),p(pfunction(lsb, A, R))],
+             m(popcount(A))    => [g(A in 0..sup),g(R in 0..sup),p(pfunction(popcount, A, R))],
              m(A<<B)           => [p(pfunction(<<, A, B, R))],
              m(A>>B)           => [p(pfunction(>>, A, B, R))],
              m(A/\B)           => [p(pfunction(/\, A, B, R))],
@@ -2940,8 +2940,8 @@ sort_by_predicate(Clauses, ByPred) :-
 predname(T, Key) :-
     (   T = (H:-_)
     ->  predname(H, Key)
-    ;   T = M:H, M:Key
-    ->  predname(H, Key)
+    ;   T = M:H, Key = M:K
+    ->  predname(H, K)
     ;   Key = Name/Arity
     ->  functor(T, Name, Arity)
     ).

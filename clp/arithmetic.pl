@@ -155,6 +155,14 @@ armt_constrain.
 
 % ?- term_expansion(armt_constrain, Cs, []), list_element(Cs, C), portray_clause(user_output, C), false.
 
+% TODO: Move this.
+leq(E0, E1) :-
+    propagator_from_constraint(pleq(E0,E1), P),
+    term_variables([E0,E1], Vs),
+    propagator_trigger(P, Vs).
+
+leq(E0, E1) --> { leq(E0, E1) }.
+
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     Arithmetic Relations
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
@@ -174,7 +182,6 @@ E0 #=< E1 :-
     propagator_trigger(P, [E4,E5]),
     term_variables([E0,E1], Vs),
     list_map(reinforce, Vs).
-% X #=< Y :- Y #>= X.
 
 %% #>=(?X, ?Y)
 %
@@ -182,9 +189,6 @@ E0 #=< E1 :-
 % to obtain more general relations.
 
 E0 #>= E1 :- E1 #=< E0.
-% X #>= Y :- clpz_geq(X, Y).
-
-clpz_geq(X, Y) :- clpz_geq_(X, Y), reinforce(X), reinforce(Y).
 
 %% #=(?X, ?Y)
 %
@@ -199,9 +203,6 @@ E0 #= E1 :-
     E4 = E5,
     term_variables([E0,E1], Vs),
     list_map(reinforce, Vs).
-% X #= Y :- clpz_equal(X, Y).
-
-clpz_equal(X, Y) :- clpz_equal_(X, Y), reinforce(X).
 
 %% #\=(?X, ?Y)
 %
@@ -218,7 +219,6 @@ E0 #\= E1 :-
     propagator_trigger(P, [E4,E5]),
     term_variables([E0,E1], Vs),
     list_map(reinforce, Vs).
-% X #\= Y :- clpz_neq(X, Y).
 
 % X #\= Y + Z
 
@@ -269,11 +269,9 @@ E0 #< E1  :-
     catch(armt_from_term(E0, E2), error(E,_), throw(error(E,(#<)/2))),
     catch(armt_from_term(E1, E3), error(E,_), throw(error(E,(#<)/2))),
     E2 #= #E4, E3 #= #E5, #E4 #=< #E5, #E4 #\= #E5.
-% X #< Y  :- Y #> X.
 
 %% #>(?X, ?Y)
 %
 % Same as Y #< X.
 
 X #> Y  :- Y #< X.
-% X #> Y  :- X #>= Y + 1.

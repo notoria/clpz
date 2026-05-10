@@ -307,8 +307,8 @@ sort_by_predicate(Clauses, ByPred) :-
 predname(T, Key) :-
     (   T = (H:-_)
     ->  predname(H, Key)
-    ;   T = M:H, M:Key
-    ->  predname(H, Key)
+    ;   T = M:H, Key = M:K
+    ->  predname(H, K)
     ;   Key = Name/Arity
     ->  functor(T, Name, Arity)
     ).

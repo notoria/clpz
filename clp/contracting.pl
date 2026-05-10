@@ -39,11 +39,7 @@ contract(Vs) :-
 '@contract'(G_2, V, T0, T) :-
     call(G_2, V, I),
     (   \+ \+ (V = I)
-    ->  T1 = false
+    ->  T = T0
     ;   #V #\= I,
-        T1 = true
-    ),
-    '@contract_or'(T0, T1, T).
-
-'@contract_or'(false, T, T).
-'@contract_or'( true, _, true).
+        T = true
+    ).

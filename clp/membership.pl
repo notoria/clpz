@@ -2,13 +2,13 @@
     Membership Constraints
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-'@in'(VD, V) :-
+'@in'(D, V) :-
     (   var(V)
     ->  propagators_empty(Ps),
         queue_empty(Q),
-        put_attr(W, clpz, clpz_attr(no,no,no,VD,Ps,Q)),
+        put_attr(W, clpz, clpz_attr(no,no,no,D,Ps,Q)),
         V = W
-    ;   domain_contains(VD, V)
+    ;   domain_contains(D, V)
     ).
     % (   fd_get(V, VD0, VPs) ->
     %     domain_inter(Dom, VD0, VD),
@@ -31,14 +31,14 @@
 %         * Domain1 `\/` Domain2
 %           The union of Domain1 and Domain2.
 
-Var in DR :-
+Var in D0 :-
     fd_variable(Var),
-    (   drep(DR)
+    (   drep(D0)
     ->  true
-    ;   domain_error(clpz_domain, DR)
+    ;   domain_error(clpz_domain, D0)
     ),
-    drep_to_domain(DR, Dom),
-    '@in'(Dom, Var),
+    drep_to_domain(D0, D),
+    '@in'(D, Var),
     reinforce(Var). % QUESTION: Why? Is it needed?
 
 fd_variable(V) :-
@@ -53,15 +53,15 @@ fd_variable(V) :-
 %
 %  The variables in the list Vars are elements of Domain.
 
-Vs ins DR :-
+Vs ins D0 :-
     fd_must_be_list(Vs),
     list_map(fd_variable, Vs),
-    (   drep(DR)
+    (   drep(D0)
     ->  true
-    ;   domain_error(clpz_domain, DR)
+    ;   domain_error(clpz_domain, D0)
     ),
-    drep_to_domain(DR, Dom),
-    list_map('@in'(Dom), Vs),
+    drep_to_domain(D0, D),
+    list_map('@in'(D), Vs),
     list_map(reinforce, Vs). % QUESTION: Why? Is it needed?
 
 fd_must_be_list(Ls) :-

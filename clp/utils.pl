@@ -11,17 +11,17 @@ variable(E) -->
     ).
 
 % mapl
-map(_, []) --> [].
+map(_G__1, []) --> [].
 map(G__1, [E|Es]) --> call(G__1, E), map(G__1, Es).
 
 % mapr
-rev(_, []) --> [].
+rev(_G__1, []) --> [].
 rev(G__1, [E|Es]) --> rev(G__1, Es), call(G__1, E).
 
-foldl(_, [], S, S) --> [].
+foldl(_G__3, [], S, S) --> [].
 foldl(G__3, [E|Es], S0, S) --> call(G__3, E, S0, S1), foldl(G__3, Es, S1, S).
 
-foldl(_, S, S).
+foldl(_G_2, S, S).
 foldl(G_2, S0, S) :-
     call(G_2, S0, S1),
     foldl(G_2, S1, S).

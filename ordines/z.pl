@@ -79,7 +79,7 @@
 % Scalar Product
 :- include("../clp/scalar_product"). % linsum?
 % Parse Arithmetic Constraints
-:- include("../clp/parse_clpz").
+%:- include("../clp/parse_clpz"). % removing
 :- include("../clp/arithmetic"). % Arithmetic Constraints.
 % Goal Expansion
 % :- include("../clp/clpz_expansion").
@@ -88,8 +88,8 @@
 % Parse Reified Constraints
 :- include("../clp/propositional"). % 	Propositional Constraints.
 % :- include("../clp/reifiable"). % parsing?
-:- include("../clp/parse_reified_clpz").
-:- include("../clp/reify").
+%:- include("../clp/parse_reified_clpz"). % removing
+%:- include("../clp/reify"). % removing
 :- include("../clp/reify_tuples_in"). % ??
 :- include("../clp/skeleton").
 % Constraint & Propagation
@@ -117,5 +117,5 @@
 :- include("../clp/uhcp"). % verifier, reifier
 :- include("../clp/psp"). % scalar product?
 :- include("../clp/reified").
-:- include("../clp/generated").
+%:- include("../clp/generated"). % removing
 ?- true.

@@ -78,7 +78,7 @@ intervals_repair(Is0, Is) :-
             '@interval_bound'(>, ZL-ZU, YU0, YU),
             YL cis_le YU
         }
-    ->  {   L cis -(-ZL div YU),
+    ->  {   L cis max(n(1),-(-ZL div YU)),
             U cis ZU div YL
         },
         [L-U]
@@ -89,7 +89,7 @@ intervals_repair(Is0, Is) :-
     (   {   '@interval_bound'(<, ZL-ZU, n(1), YL),
             '@interval_bound'(>, ZL-ZU, YU0, YU)
         }
-    ->  {   L cis -(-ZL div YU),
+    ->  {   L cis max(n(1),-(-ZL div YU)),
             U cis ZU div YL
         },
         [L-U]

@@ -18,8 +18,8 @@ cis_compare(_, A, B) :-
     bound(B),
     throw(error(instantiation_error,cis_compare/3)).
 cis_compare(_, A, B) :-
-    bound(A),
     var(B),
+    bound(A),
     throw(error(instantiation_error,cis_compare/3)).
 cis_compare(=, inf, inf). % Extension
 cis_compare(<, inf, n(_)).

@@ -131,6 +131,11 @@ automaton(Seqs, Template, Sigs, Ns, As0, Cs, Is, Fs) :-
             [s(_,Exprs1)]
         ),
         list_map(expr0_expr, Exprs1, Exprs),
+        % pairs_keys_values(SSs, Seqs, Sigs),
+        % phrase(
+        %     foldl(transition(Template, Exprs, Cs), SSs, s(Start,Is), s(End,Fs)),
+        %     Tuples
+        % ),
         phrase(
             transitions(Seqs, Template, Sigs, Start, End, Exprs, Cs, Is, Fs),
             Tuples
@@ -144,6 +149,10 @@ automaton(Seqs, Template, Sigs, Ns, As0, Cs, Is, Fs) :-
 expr0_expr(Es0-_, Es) :-
         pairs_keys(Es0, Es1),
         list_reversed(Es1, Es).
+
+% transition(Template, Exprs, Counters, Seq-Sig, s(S0,Cs0), s(S,Cs)) -->
+%     [[S0,Sig,S|Is]],
+%     { phrase(exprs_next(Exprs, Is, Cs), [s(Seq,Template,Counters,Cs0)], _) }.
 
 transitions([], _, [], S, S, _, _, Cs, Cs) --> [].
 transitions([Seq|Seqs], Template, [Sig|Sigs], S0, S, Exprs, Counters, Cs0, Cs) -->
@@ -160,7 +169,7 @@ exprs_next([Es|Ess], [I|Is], [C|Cs]) -->
 exprs_values([], []) --> [].
 exprs_values([E0|Es], [V|Vs]) -->
         { term_variables(E0, EVs0),
-          copy_term(E0, E),
+          copy_term(E0, E), % Are attributes supposed to be kept?
           term_variables(E, EVs),
           #V #= E },
         match_variables(EVs0, EVs),
@@ -207,6 +216,12 @@ node_num(Node, Num) -->
 include_args1(Goal, Ls0, As) :-
         include(Goal, Ls0, Ls),
         list_map(arg(1), Ls, As).
+
+%source(source(S)) --> [S].
+%source(sink(_)) --> [].
+%
+%sink(source(_)) --> [].
+%sink(sink(S)) --> [S].
 
 source(source(_)).
 

@@ -348,7 +348,7 @@ gcc_check_([Key-Num0|KNs]) -->
               put_attr(Num0, clpz_gcc_vs, Os),
               put_attr(Num0, clpz_gcc_occurred, Occ1),
               integer_add(Min, Occ0, Occ1) /* Occ1 #= Occ0+Min */ },
-            geq(Num, Occ1),
+            { #Occ1 #=< #Num }, % leq(Occ1, Num), % geq(Num, Occ1),
             % The queue is disabled for efficiency here in any case.
             % If it were enabled, make sure to retain the invariant
             % that gcc_global is never triggered during an
@@ -358,7 +358,7 @@ gcc_check_([Key-Num0|KNs]) -->
             ;   Os == [] -> { gcc_done(Num0) }, Num = Occ1
             ;   { list_length(Os, L),
                   integer_add(Occ1, L, Max) /* Max #= Occ1+L */ },
-                geq(Max, Num),
+                { #Max #=< #Num }, % leq(Max, Num), % geq(Max, Num),
                 (   { nonvar(Num) }
                 ->  { integer_add(Diff, Occ1, Num) } % Diff #= Num-Occ1
                 ;   { fd_get(Num, ND, _),

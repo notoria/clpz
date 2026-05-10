@@ -13,9 +13,11 @@
 
 sum(Vs, Op, Value) :-
         must_be(list, Vs),
-        list_equisized(Vs, Ones),
-        list_map(=(1), Ones),
-        scalar_product(Ones, Vs, Op, Value).
+        list_foldl('@clpz_add', Vs, 0, V),
+        call(Op, #V, #Value).
+        % list_equisized(Vs, Ones),
+        % list_map(=(1), Ones),
+        % scalar_product(Ones, Vs, Op, Value).
 
 %% scalar_product(+Cs, +Vs, +Rel, ?Expr)
 %
@@ -23,15 +25,19 @@ sum(Vs, Op, Value) :-
 % Cs is a list of integers, Vs is a list of variables and integers.
 % Rel is #=, #\=, #<, #>, #=< or #>=.
 
-foldl(_G_4, [], [], S, S).
-foldl(G_4, [E0|Es0], [E1|Es1], S0, S) :-
-    call(G_4, E0, E1, S0, S1),
-    foldl(G_4, Es0, Es1, S1, S).
-
 scalar_product(Cs, Vs, Op, Value) :-
         must_be(list(integer), Cs),
         must_be(list, Vs),
         list_map(fd_variable, Vs),
+        %list_map('@clpz_mul', Cs, Vs, Ps),
+        %list_foldl('@clpz_add', Ps, 0, V),
+        %%foldl(mul_add, Cs, Vs, 0, V),
+        %list_foldl(integer_gcd, Cs, 0, G),
+        %(   Op = (#=)
+        %->  Value mod #G #= #0
+        %;   true
+        %),
+        %call(Op, #V, Value).
         (   Op = (#=), single_value(Value, Right), ground(Vs) ->
             list_foldl(coeff_int_linsum, Cs, Vs, 0, Right)
         ;   must_be(ground, Op),
@@ -45,6 +51,20 @@ scalar_product(Cs, Vs, Op, Value) :-
             ;   sum(Cs, Vs, 0, Op, Value)
             )
         ).
+
+foldl(_G_4, [], [], S, S).
+foldl(G_4, [E0|Es0], [E1|Es1], S0, S) :-
+    call(G_4, E0, E1, S0, S1),
+    foldl(G_4, Es0, Es1, S1, S).
+
+'@clpz_add'(X, Y, Z) :-
+    #X + #Y #= #Z.
+
+'@clpz_mul'(X, Y, Z) :-
+    #X * #Y #= #Z.
+
+mul_add(C, V, S0, S) :-
+    #S #= #S0 + #C * #V.
 
 single_value(V, T)    :- var(V), !, non_monotonic(V), T = V.
 single_value(I, T)    :- integer(I), T = I.

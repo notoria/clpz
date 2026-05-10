@@ -30,7 +30,7 @@ v_or_i(T) :-
 
 must_be_fd_integer(X) :-
     (   var(X)
-    ->  constrain_to_integer(X)
+    ->  X in inf..sup
     ;   must_be(integer, X)
     ).
 
@@ -61,7 +61,7 @@ vns_coeffs_variables([vn(V,N)|VNs], N0, V0, Ns, Vs) :-
 filter_linsum([], [], [], []).
 filter_linsum([C0|Cs0], [V0|Vs0], Cs, Vs) :-
     (   C0 =:= 0
-    ->  constrain_to_integer(V0),
+    ->  V0 in inf..sup,
         filter_linsum(Cs0, Vs0, Cs, Vs)
     ;   Cs = [C0|Cs1], Vs = [V0|Vs1],
         filter_linsum(Cs0, Vs0, Cs1, Vs1)

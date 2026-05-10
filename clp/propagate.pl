@@ -272,7 +272,7 @@ propagate(pelement(N, Is, V), MState) -->
         (   { fd_get(N, NDom, _) } ->
             (   { fd_get(V, VDom, VPs) } ->
                 { domain_empty(Empty),
-                  integers_remaining(Is, 1, NDom, Empty, VDom1),
+                  list_foldl('@element_domain'(NDom), Is, 1-Empty, _-VDom1),
                   domain_inter(VDom, VDom1, VDom2) },
                 fd_put(V, VDom2, VPs)
             ;   []
@@ -654,7 +654,7 @@ propagate(pfunction(Op,A,R), MState) -->
 propagate(reified_geq(DX,X,DY,Y,Ps,B), MState) -->
         (   DX == 0 -> kill(MState, Ps), B = 0
         ;   DY == 0 -> kill(MState, Ps), B = 0
-        ;   B == 1 ->  kill(MState), DX = 1, DY = 1, { geq(X, Y) }
+        ;   B == 1 ->  kill(MState), DX = 1, DY = 1, queue_goal(#Y #>= #X)
         ;   DX == 1, DY == 1 ->
             (   var(B) ->
                 (   nonvar(X) ->
@@ -1309,8 +1309,7 @@ propagate_imul0_x(MState, X, Y, Z) -->
                 domain_contains(ZD, 0, ZT),
                 '@propagate_imul0_xy'(YT, ZD, YD, XD0, XD1),
                 '@propagate_imul0_xz'(ZT, ZD, YD, XD0, XD2),
-                % if_(
-                %     domain_contains(YD, 0),
+                % if_(domain_contains(YD, 0),
                 %     XD1 = XD0,
                 %     (   list_foldl(
                 %             call,
@@ -1324,13 +1323,11 @@ propagate_imul0_x(MState, X, Y, Z) -->
                 %             YD,
                 %             YUL
                 %         ),
-                %         if_(
-                %             bound_finite(YLU),
+                %         if_(bound_finite(YLU),
                 %             interval_factor(ZL-ZU, YL-YLU, XIs1_Y),
                 %             XIs1_Y = []
                 %         ),
-                %         if_(
-                %             bound_finite(YUL),
+                %         if_(bound_finite(YUL),
                 %             interval_factor(ZL-ZU, YUL-YU, XIs2_Y),
                 %             XIs2_Y = []
                 %         ),
@@ -1339,8 +1336,7 @@ propagate_imul0_x(MState, X, Y, Z) -->
                 %         domain_inter(XD1_Y, XD0, XD1)
                 %     )
                 % ),
-                % if_(
-                %     domain_contains(ZD, 0),
+                % if_(domain_contains(ZD, 0),
                 %     XD2 = XD0,
                 %     (   list_foldl(
                 %             call,
@@ -1354,13 +1350,11 @@ propagate_imul0_x(MState, X, Y, Z) -->
                 %             ZD,
                 %             ZUL
                 %         ),
-                %         if_(
-                %             bound_finite(ZLU),
+                %         if_(bound_finite(ZLU),
                 %             interval_factor(ZL-ZLU, YL-YU, XIs1_Z),
                 %             XIs1_Z = []
                 %         ),
-                %         if_(
-                %             bound_finite(ZUL),
+                %         if_(bound_finite(ZUL),
                 %             interval_factor(ZUL-ZU, YL-YU, XIs2_Z),
                 %             XIs2_Z = []
                 %         ),
@@ -1372,8 +1366,7 @@ propagate_imul0_x(MState, X, Y, Z) -->
                 % ),
                 domain_inter(XD1, XD2, XD3),
                 domain_inter(XD3, XD0, XD)
-                % if_(
-                %     domain_contains(ZD, 0),
+                % if_(domain_contains(ZD, 0),
                 %     XD = XD0,
                 %     (   domain_infimum(ZD, ZL),
                 %         domain_supremum(ZD, ZU),
@@ -1467,8 +1460,7 @@ propagate_imul1_z(MState, X, Y, Z) -->
             },
             '@propagate_imul1_z0'(XT, MState, Y)
         % ->  {   fd_get(X, XD, _),
-        %         if_(
-        %             domain_contains(XD, 0),
+        %         if_(domain_contains(XD, 0),
         %             G_X = true,
         %             (   kill(MState),
         %                 G_X = (Y = 0)
@@ -1484,8 +1476,7 @@ propagate_imul1_z(MState, X, Y, Z) -->
             },
             '@propagate_imul1_z0'(YT, MState, X)
         % ->  {   fd_get(Y, YD, _),
-        %         if_(
-        %             domain_contains(YD, 0),
+        %         if_(domain_contains(YD, 0),
         %             G_Y = true,
         %             (   kill(MState),
         %                 G_Y = (X = 0)
@@ -4540,8 +4531,7 @@ propagate_iadd0_x(MState, B, X, Y, Z) -->
                 domain_infimum(ZD0, ZL0), domain_supremum(ZD0, ZU0),
                 XL cis ZL0-YU0, XU cis ZU0-YL0,
                 domain_from_bounds(XL, XU, XD),
-                if_(
-                    domain_intersects(XD0, XD),
+                if_(domain_intersects(XD0, XD),
                     G = true,
                     (kill(MState), G = (B = 0))
                 )
@@ -4561,8 +4551,7 @@ propagate_iadd0_z(MState, B, X, Y, Z) -->
                 domain_infimum(YD0, YL0), domain_supremum(YD0, YU0),
                 ZL cis XL0+YL0, ZU cis XU0+YU0,
                 domain_from_bounds(ZL, ZU, ZD),
-                if_(
-                    domain_intersects(ZD0, ZD),
+                if_(domain_intersects(ZD0, ZD),
                     G = true,
                     (kill(MState), G = (B = 0))
                 )
@@ -5032,8 +5021,7 @@ propagate_bmod(MState, B, X, Y, Z) -->
     % (   { B == 0 }
     % ->  (   { var(Y) }
     %     ->  {   fd_get(Y, YD, _),
-    %             if_(
-    %                 domain_contains(YD, 0),
+    %             if_(domain_contains(YD, 0),
     %                 G = true,
     %                 (kill(MState), G = (#X mod #Y #\= #Z))
     %             )
