@@ -14,7 +14,7 @@
 sum(Vs, Op, Value) :-
         must_be(list, Vs),
         list_foldl('@clpz_add', Vs, 0, V),
-        call(Op, #V, #Value).
+        call(Op, #V, Value).
         % list_equisized(Vs, Ones),
         % list_map(=(1), Ones),
         % scalar_product(Ones, Vs, Op, Value).

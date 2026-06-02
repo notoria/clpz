@@ -16,6 +16,9 @@
     ;   true
     ).
 
+findall(T, G, Ts) :-
+    findall(T, G, Ts, []).
+
 copy_term_nat(T0, T) :-
     copy_term(T0, T).
 

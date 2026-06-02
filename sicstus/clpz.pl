@@ -162,7 +162,7 @@ succ(S0, S) :-
     var(S),
     throw(error(instantiation_error,succ/2)).
 succ(S0, S) :-
-   (    var(S0)
+    (    var(S0)
     ->  integer(S),
         S0 is S-1
     ;   integer(S0),
@@ -2646,13 +2646,13 @@ parse_clpz(E, R,
              m(A*B)            => [p(ptimes(A, B, R))],
              m(A-B)            => [p(pplus(R,B,A))],
              m(-A)             => [p(pplus(A,R,0))],
-             m(max(A,B))       => [g(A #=< #R), g(B #=< R), p(pmax(A, B, R))],
-             m(min(A,B))       => [g(A #>= #R), g(B #>= R), p(pmin(A, B, R))],
-             m(A mod B)        => [g(B #\= 0), p(pmod(A, B, R))],
-             m(A rem B)        => [g(B #\= 0), p(prem(A, B, R))],
-             m(abs(A))         => [g(#R #>= 0), p(pabs(A, R))],
-             m(A/B)            => [g(B #\= 0), p(ptimes(R, B, A))],
-             m(A//B)           => [g(B #\= 0), p(ptzdiv(A, B, R))],
+             m(max(A,B))       => [g(A #=< #R), g(B #=< #R), p(pmax(A, B, R))],
+             m(min(A,B))       => [g(A #>= #R), g(B #>= #R), p(pmin(A, B, R))],
+             m(A mod B)        => [g(B #\= #0), p(pmod(A, B, R))],
+             m(A rem B)        => [g(B #\= #0), p(prem(A, B, R))],
+             m(abs(A))         => [g(#R #>= #0), p(pabs(A, R))],
+             m(A/B)            => [g(B #\= #0), p(ptimes(R, B, A))],
+             m(A//B)           => [g(B #\= #0), p(ptzdiv(A, B, R))],
              m(A div B)        => [g(#R #= (A - (A mod B)) // B)],
              m(A^B)            => [p(pexp(A, B, R))],
              m(sign(A))        => [g(R in -1..1), p(psign(A, R))],

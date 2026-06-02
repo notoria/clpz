@@ -175,7 +175,7 @@ succ(S0, S) :-
     var(S),
     throw(error(instantiation_error,succ/2)).
 succ(S0, S) :-
-   (    var(S0)
+    (    var(S0)
     ->  integer(S),
         S0 is S-1
     ;   integer(S0),
@@ -257,13 +257,36 @@ type_error(Expectation, Term) :-
 % foldl(Goal_4, Xs, Ys, A0, A) :-
 %     lists:scanlist(Goal_4, Xs, Ys, A0, A).
 % 
-% :- meta_predicate(partition(1, ?, ?, ?)).
-% 
-% partition(Pred, Ls0, As, Bs) :-
-%         include(Pred, Ls0, As),
-%         exclude(Pred, Ls0, Bs).
-% 
-% sum_list(Ls, S) :- lists:sumlist(Ls, S).
+:- meta_predicate(partition(1, ?, ?, ?)).
+
+partition(Pred, Ls0, As, Bs) :-
+        include(Pred, Ls0, As),
+        exclude(Pred, Ls0, Bs).
+
+:- meta_predicate(partition(1, ?, ?, ?, ?)).
+
+'@partition'(>, Pred, [X|Xs], Ls, Es, [X|Gs]) :-
+    partition(Pred, Xs, Ls, Es, Gs).
+'@partition'(=, Pred, [X|Xs], Ls, [X|Es], Gs) :-
+    partition(Pred, Xs, Ls, Es, Gs).
+'@partition'(<, Pred, [X|Xs], [X|Ls], Es, Gs) :-
+    partition(Pred, Xs, Ls, Es, Gs).
+
+partition(_Pred, [], [], [], []).
+partition(Pred, [X|Xs], Ls, Es, Gs) :-
+    call(Pred, X, Cmp),
+    '@partition'(Cmp, Pred, [X|Xs], Ls, Es, Gs).
+
+%'@sum_list'(A, B, C) :-
+%    C is B+A.
+%
+%sum_list([L|Ls], S) :-
+%    foldl('@sum_list', Ls, L, S).
+
+foldl(_G_4, [], [], S, S).
+foldl(G_4, [E0|Es0], [E1|Es1], S0, S) :-
+    call(G_4, E0, E1, S0, S1),
+    foldl(G_4, Es0, Es1, S1, S).
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    include/3 and exclude/3
@@ -2404,9 +2427,9 @@ scalar_product(Cs, Vs, Op, Value) :-
             )
         ).
 
-single_value(V, T)    :- var(V), !, non_monotonic(V), T = V.
-single_value(I, T)    :- integer(I), T = I.
-single_value(?(V), T) :- fd_variable(V), T = V.
+single_value(T, V)    :- var(T), !, non_monotonic(T), V = T.
+single_value(T, I)    :- integer(T), I = T.
+single_value(?(V0), V) :- fd_variable(V0), V = V0.
 
 coeff_var_plusterm(C, V, T0, T0+(C* #V)).
 
@@ -2661,13 +2684,13 @@ parse_clpz(E, R,
              m(A*B)            => [p(ptimes(A, B, R))],
              m(A-B)            => [p(pplus(R,B,A))],
              m(-A)             => [p(pplus(A,R,0))],
-             m(max(A,B))       => [g(A #=< #R), g(B #=< R), p(pmax(A, B, R))],
-             m(min(A,B))       => [g(A #>= #R), g(B #>= R), p(pmin(A, B, R))],
-             m(A mod B)        => [g(B #\= 0), p(pmod(A, B, R))],
-             m(A rem B)        => [g(B #\= 0), p(prem(A, B, R))],
-             m(abs(A))         => [g(#R #>= 0), p(pabs(A, R))],
-             m(A/B)            => [g(B #\= 0), p(ptimes(R, B, A))],
-             m(A//B)           => [g(B #\= 0), p(ptzdiv(A, B, R))],
+             m(max(A,B))       => [g(A #=< #R), g(B #=< #R), p(pmax(A, B, R))],
+             m(min(A,B))       => [g(A #>= #R), g(B #>= #R), p(pmin(A, B, R))],
+             m(A mod B)        => [g(B #\= #0), p(pmod(A, B, R))],
+             m(A rem B)        => [g(B #\= #0), p(prem(A, B, R))],
+             m(abs(A))         => [g(#R #>= #0), p(pabs(A, R))],
+             m(A/B)            => [g(B #\= #0), p(ptimes(R, B, A))],
+             m(A//B)           => [g(B #\= #0), p(ptzdiv(A, B, R))],
              m(A div B)        => [g(#R #= (A - (A mod B)) // B)],
              m(A^B)            => [p(pexp(A, B, R))],
              m(sign(A))        => [g(R in -1..1), p(psign(A, R))],
@@ -7907,15 +7930,18 @@ intervals_to_drep([A0-B0|Rest], Drep0, Drep) :-
 
 attribute_goals(X) -->
         % { get_attr(X, clpz, Attr), format("A: ~w\n", [Attr]) },
-        { get_attr(X, clpz, clpz_attr(_,_,_,Dom,fd_props(Gs,Bs,Os),_)),
-          append(Gs, Bs, Ps0),
-          append(Ps0, Os, Ps),
-          domain_to_drep(Dom, Drep) },
-        (   { default_domain(Dom), \+ all_dead_(Ps) } -> []
-        ;   [clpz:(X in Drep)]
-        ),
-        attributes_goals(Ps),
-        { del_attr(X, clpz) }.
+        (   { get_attr(X, clpz, _) }
+        ->  { get_attr(X, clpz, clpz_attr(_,_,_,Dom,fd_props(Gs,Bs,Os),_)),
+              append(Gs, Bs, Ps0),
+              append(Ps0, Os, Ps),
+              domain_to_drep(Dom, Drep) },
+            (   { default_domain(Dom), \+ all_dead_(Ps) } -> []
+            ;   [clpz:(X in Drep)]
+            ),
+            attributes_goals(Ps),
+            { del_attr(X, clpz) }
+        ;   []
+        ).
 
 attributes_goals([]) --> [].
 attributes_goals([propagator(P, State)|As]) -->

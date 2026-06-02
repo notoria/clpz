@@ -358,7 +358,7 @@ gcc_check_([Key-Num0|KNs]) -->
             ;   Os == [] -> { gcc_done(Num0) }, Num = Occ1
             ;   { list_length(Os, L),
                   integer_add(Occ1, L, Max) /* Max #= Occ1+L */ },
-                { #Max #=< #Num }, % leq(Max, Num), % geq(Max, Num),
+                { #Num #=< #Max }, % leq(Num, Max), % geq(Max, Num),
                 (   { nonvar(Num) }
                 ->  { integer_add(Diff, Occ1, Num) } % Diff #= Num-Occ1
                 ;   { fd_get(Num, ND, _),

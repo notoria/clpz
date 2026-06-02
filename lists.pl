@@ -18,6 +18,9 @@ foldl(G_3, Es, S0, S) :-
 member(E, Es) :-
     list_element(Es, E).
 
+memberchk(E, Es) :-
+    once(member(E, Es)).
+
 length(Es, N) :-
     list_length(Es, N).
 
@@ -42,6 +45,9 @@ list_si(Es0) :-
         throw(error(instantiation_error,list_si/1))
     ;   Es = []
     ).
+
+list_to_set(Es0, Es) :-
+    '$uniques'(Es0, Es).
 
 same_length(Es0, Es) :-
     list_equisized(Es0, Es).

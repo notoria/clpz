@@ -1,6 +1,6 @@
-:- include("core").
-:- include("dcg").
-:- include("list").
+:- include("../core").
+:- include("../dcg").
+:- include("../list").
 
 
 identity(E) --> [E].

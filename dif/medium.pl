@@ -1,30 +1,32 @@
-:- include("core").
-:- include("dcg").
-:- include("list").
+:- include("../core").
+:- include("../dcg").
+:- include("../list").
 
 
 identity(E) --> [E].
 
-map(_, []) --> [].
+map(_G__1, []) --> [].
 map(G__1, [E|Es]) --> call(G__1, E), map(G__1, Es).
 
-map(_, [], []) --> [].
+map(_G__2, [], []) --> [].
 map(G__2, [E0|Es0], [E|Es]) --> call(G__2, E0, E), map(G__2, Es0, Es).
 
 % equations(X, Y) --> call('@equations'(X, Y)).
 
-equations(X, Y, Eqs0, Eqs) :-
-    phrase('@equations'(Eqs0, X, Y), Eqs0, Eqs).
+equations(X, Y, Es0, Es) :-
+    phrase('@equations'([], Es0, X, Y), Es0, Es).
 
-'@equations'(Eqs0, X, Y) -->
+'@equations'(Es, Es0, X, Y) -->
     (   { X == Y }
+    ->  []
+    ;   { list_element(Es, E0), list_element([X=Y,Y=X], E), E0 == E }
     ->  []
     ;   { nonvar(X), nonvar(Y) }
     ->  {   functor(X, N, A), functor(Y, N, A),
             X =.. [N|Xs0], Y =.. [N|Ys0]
         },
-        map('@equations'(Eqs0), Xs0, Ys0)
-    ;   { list_element([X=Y,Y=X], Eq), \+ list_map(\==(Eq), Eqs0) }
+        map('@equations'([X=Y|Es], Es0), Xs0, Ys0)
+    ;   { list_element([X=Y,Y=X], E), \+ list_map(\==(E), Es0) }
     ->  []
     ;   [X=Y]
     ).
@@ -73,6 +75,13 @@ dif_insert(X=Y, V) :-
     ),
     put_attribute(+, V, difs([X=Y|Es])).
 
+'@dif_remove'([], V) :-
+    put_attribute(-, V, difs(_)),
+    put_verifier(-, V, differ),
+    put_reifier(-, V, differed).
+'@dif_remove'([E|Es], V) :-
+    put_attribute(+, V, difs([E|Es])).
+
 dif_remove(X=Y, V) :-
     (   get_attribute(+, V, difs(Es0)),
         list_select(E0, Es0, Es),
@@ -81,13 +90,6 @@ dif_remove(X=Y, V) :-
     ->  '@dif_remove'(Es, V)
     ;   true
     ).
-
-'@dif_remove'([], V) :-
-    put_attribute(-, V, difs(_)),
-    put_verifier(-, V, differ),
-    put_reifier(-, V, differed).
-'@dif_remove'([E|Es], V) :-
-    put_attribute(+, V, difs([E|Es])).
 
 dif_clean(X=Y) :-
     term_variables(X=Y, Vs),
@@ -138,10 +140,12 @@ dif_single(K-Vs0) -->
         map(identity, Vs)
     ).
 
+% X=Y => X_0=Y_0\/X_1=Y_1\/... <=> dif(X_0,Y_0)/\dif(X_1,Y_1)/\.. => dif(X,Y)
+
 dif_once(X, Y) :-
     E = (X=Y),
-    % term_variables(E, Vs),
-    dif_variables(E, Vs),
+    term_variables(E, Vs),
+    %%dif_variables(E, Vs),
     phrase(map(dif_eqs, Vs), Es0),
     '$uniques'(Es0, Es),
     (   copy_term([E|Es], [T=T|Fs]),
@@ -156,13 +160,12 @@ dif(X, Y) :-
     (   copy_term(X=Y, U=V),
         U \= V
     ->  true
-    ;   (   (acyclic_term(X) ; acyclic_term(Y)),
-            phrase(equations(X, Y), [E])
+    ;   (   phrase(equations(X, Y), [E])
         ->  true
         ;   E = (X=Y)
         ),
-        % term_variables(E, Vs),
-        dif_variables(E, Vs),
+        term_variables(E, Vs),
+        %%dif_variables(E, Vs),
         phrase(map(dif_eqs, Vs), Es0),
         '$uniques'(Es0, Es),
         (   copy_term([E|Es], [T=T|Fs]),

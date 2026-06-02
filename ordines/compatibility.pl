@@ -18,10 +18,6 @@ member(E, Es) :-
 seq([]) --> [].
 seq([E|Es]) --> [E], seq(Es).
 
-list_si(Es0) :-
-    '$skip_max_list'(_, _, Es0, Es),
-    '@list_si'(Es).
-
 '@list_si'(Es) :-
     var(Es),
     throw(error(instantiation_error,list_si/1)).
@@ -29,6 +25,10 @@ list_si(Es0) :-
     Es \= [],
     throw(error(type_error(list,Es),list_si/1)).
 '@list_si'([]).
+
+list_si(Es0) :-
+    '$skip_max_list'(_, _, Es0, Es),
+    '@list_si'(Es).
 
 cyclic_term(T) :-
         \+ acyclic_term(T).
